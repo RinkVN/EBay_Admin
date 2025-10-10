@@ -6,6 +6,8 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+package-lock.json
+
 # Runtime data
 pids
 *.pid
@@ -85,6 +87,14 @@ out
 # Nuxt.js build / generate output
 .nuxt
 dist
+*.local
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
 # Gatsby files
 .cache/
@@ -140,8 +150,8 @@ dist
 .history/*
 
 # System Files
-.DS_Store
-.DS_Store?
+/.DS_Store
+*/.DS_Store?
 ._*
 .Spotlight-V100
 .Trashes
@@ -186,8 +196,8 @@ public/uploads/
 *.rar
 
 # OS generated files
-.DS_Store
-.DS_Store?
+/.DS_Store
+*/.DS_Store?
 ._*
 .Spotlight-V100
 .Trashes
@@ -197,3 +207,5 @@ Thumbs.db
 # Package manager lock files (uncomment if you want to ignore them)
 # package-lock.json
 # yarn.lock
+.DS_Store
+.DS_Store
