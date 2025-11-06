@@ -61,6 +61,7 @@ import ManageStore from "./pages/DashboardAdmin/ManageShop/ManageStore";
 import ManageProductA from "./pages/DashboardAdmin/ManageProduct/ManageProduct";
 import ManageVoucher from "./pages/DashboardAdmin/ManageVoucher/ManageVoucher";
 import AdminDashboardLayout from "./pages/DashboardAdmin/ManagerDashboardAdminLaydout";
+import AdminSetup2FA from "./pages/AdminSetup2FA.jsx";
 
 
 const Layout = () => {
@@ -109,7 +110,7 @@ const router = createBrowserRouter(
         <Route path="/create-dispute/:orderItemId" element={<CreateDisputeForm />}></Route>
         <Route path="/return-requests" element={<ReturnRequestsList />}></Route>
       </Route>
-      
+
       <Route path="/" element={<ManagerDashboardSellerLaydout />} errorElement={<ErrorPage />}>
         <Route path="overview" element={<Overview />}></Route>
         <Route path="manage-product" element={<ManageProduct />}></Route>
@@ -122,7 +123,7 @@ const router = createBrowserRouter(
         <Route path="manage-return-request" element={<ManageReturnRequest />} />
       </Route>
 
-       <Route path="/admin" element={<AdminDashboardLayout />}>
+      <Route path="/admin" element={<AdminDashboardLayout />}>
         <Route path="/admin" element={<OverviewA />}></Route>
         <Route
           path="/admin/manage-products"
@@ -134,6 +135,7 @@ const router = createBrowserRouter(
       </Route>
 
       <Route path="/signin" element={<SignIn />}></Route>
+      <Route path="/admin/setup-2fa" element={<AdminSetup2FA />}></Route>
       <Route path="/signup" element={<SignUp />}></Route>
       <Route path="/store-registration" element={<StoreRegistration />}></Route>
       <Route path="/forgot-password" element={<ForgotPassword />}></Route>

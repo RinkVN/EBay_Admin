@@ -3,6 +3,8 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const logger = require("../utils/logger");
 const { sendEmail } = require("../services/emailService");
+const speakeasy = require('speakeasy');
+const qrcode = require('qrcode');
 
 // Hàm kiểm tra định dạng email
 const validateEmail = (email) => {
@@ -93,11 +95,56 @@ exports.login = async (req, res) => {
       return res.status(400).json({ success: false, message: "Thông tin đăng nhập không hợp lệ" });
     }
 
-    // Tạo JWT token
+    // Admin IP/2FA policy
+    const { isInternalIp } = require('../utils/ip');
+    const internal = isInternalIp(req);
+
+    // If admin and not internal and 2FA enabled -> return temp token and requires2FA
+    if (user.role === 'admin' && !internal) {
+      // If a trusted-device cookie exists and is valid, bypass 2FA
+      const deviceCookie = req.cookies && req.cookies.admin_trusted_device;
+      if (deviceCookie && user.trustedDevices && user.trustedDevices.length) {
+        const crypto = require('crypto');
+        const hash = crypto.createHash('sha256').update(deviceCookie).digest('hex');
+        const now = new Date();
+        const match = user.trustedDevices.find(d => d.tokenHash === hash && d.expiresAt > now);
+        if (match) {
+          const token = jwt.sign(
+            { id: user._id, role: user.role, twoFAVerified: true },
+            process.env.JWT_SECRET,
+            { expiresIn: '1d' }
+          );
+          return res.json({ success: true, token, user: { id: user._id, username: user.username, role: user.role } });
+        }
+      }
+
+      if (!user.twoFAEnabled) {
+        // Force setup before allowing admin access from outside
+        const tempSetupToken = jwt.sign(
+          { id: user._id, role: user.role, twoFASetup: true },
+          process.env.JWT_SECRET,
+          { expiresIn: '10m' }
+        );
+        return res.json({ success: true, requires2FASetup: true, token: tempSetupToken });
+      } else {
+        const tempToken = jwt.sign(
+          { id: user._id, role: user.role, twoFARequired: true },
+          process.env.JWT_SECRET,
+          { expiresIn: '10m' }
+        );
+        return res.json({
+          success: true,
+          requires2FA: true,
+          token: tempToken
+        });
+      }
+    }
+
+    // Otherwise issue full token (include twoFAVerified if internal)
     const token = jwt.sign(
-      { id: user._id, role: user.role },
+      { id: user._id, role: user.role, twoFAVerified: internal },
       process.env.JWT_SECRET,
-      { expiresIn: "1d" }
+      { expiresIn: '1d' }
     );
 
     res.json({
@@ -212,6 +259,79 @@ exports.getProfile = async (req, res) => {
   }
 };
 
+// --- Admin 2FA setup (TOTP) ---
+exports.setupAdmin2FA = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Only admin can setup 2FA' });
+    }
+    const secret = speakeasy.generateSecret({ name: `Shopii Admin (${user.email})` });
+    user.twoFASecret = secret.base32;
+    user.twoFAEnabled = true;
+    await user.save();
+
+    const otpauth = secret.otpauth_url;
+    const qr = await qrcode.toDataURL(otpauth);
+    return res.json({ success: true, otpauth, qr });
+  } catch (err) {
+    logger.error('setupAdmin2FA error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+// --- Verify admin 2FA and issue full token ---
+exports.verifyAdmin2FA = async (req, res) => {
+  try {
+    const { token, trustDevice } = req.body; // 6-digit code and optional trust flag
+    const authHeader = req.headers.authorization || '';
+    const temp = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
+    if (!temp) {
+      return res.status(400).json({ success: false, message: 'Missing temporary token' });
+    }
+    const decoded = jwt.verify(temp, process.env.JWT_SECRET);
+    if (!decoded.twoFARequired) {
+      return res.status(400).json({ success: false, message: 'Token is not a 2FA token' });
+    }
+    const user = await User.findById(decoded.id);
+    if (!user || !user.twoFAEnabled || !user.twoFASecret) {
+      return res.status(400).json({ success: false, message: '2FA not set up' });
+    }
+    const ok = speakeasy.totp.verify({ secret: user.twoFASecret, encoding: 'base32', token });
+    if (!ok) {
+      return res.status(401).json({ success: false, message: 'Invalid 2FA code' });
+    }
+    const fullToken = jwt.sign(
+      { id: user._id, role: user.role, twoFAVerified: true },
+      process.env.JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+    // If trusting this device, set a cookie and store token hash
+    if (trustDevice) {
+      const crypto = require('crypto');
+      const raw = crypto.randomBytes(32).toString('hex');
+      const hash = crypto.createHash('sha256').update(raw).digest('hex');
+      const ttlDays = parseInt(process.env.ADMIN_TRUSTED_DEVICE_TTL_DAYS || '30', 10);
+      const expiresAt = new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000);
+
+      user.trustedDevices = (user.trustedDevices || []).filter(d => d.expiresAt > new Date());
+      user.trustedDevices.push({ tokenHash: hash, userAgent: req.headers['user-agent'], expiresAt });
+      await user.save();
+
+      res.cookie('admin_trusted_device', raw, {
+        httpOnly: true,
+        secure: !!(process.env.NODE_ENV === 'production'),
+        sameSite: 'lax',
+        maxAge: ttlDays * 24 * 60 * 60 * 1000
+      });
+    }
+    return res.json({ success: true, token: fullToken });
+  } catch (err) {
+    logger.error('verifyAdmin2FA error:', err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
 // Update user profile
 exports.updateProfile = async (req, res) => {
   try {
@@ -265,16 +385,16 @@ exports.updatePassword = async (req, res) => {
 
     // Validation
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Current password and new password are required" 
+      return res.status(400).json({
+        success: false,
+        message: "Current password and new password are required"
       });
     }
 
     if (newPassword.length < 6) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "New password must be at least 6 characters" 
+      return res.status(400).json({
+        success: false,
+        message: "New password must be at least 6 characters"
       });
     }
 

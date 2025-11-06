@@ -12,16 +12,21 @@ api.interceptors.request.use(
     config => {
         // Try to get token from localStorage first (this is most common)
         let token = localStorage.getItem('token');
-        
+
         // If not found, try to get from accessToken key (alternative storage key)
         if (!token) {
             token = localStorage.getItem('accessToken');
         }
-        
+
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         } else {
             console.warn('No authentication token found for API request');
+        }
+        // For testing: simulate outside IP so backend treats request as external
+        const fakeIp = process.env.REACT_APP_FAKE_IP;
+        if (fakeIp) {
+            config.headers['X-Forwarded-For'] = fakeIp;
         }
         return config;
     },
@@ -41,14 +46,14 @@ api.interceptors.response.use(
 
             try {
                 const { data } = await axios.post(`${BACKEND_API_URI}/user/refresh-token`);
-                
+
                 // Store the new token
                 localStorage.setItem('token', data.accessToken);
                 localStorage.setItem('accessToken', data.accessToken);
-                
+
                 // Update the original request with the new token
                 originalRequest.headers['Authorization'] = `Bearer ${data.accessToken}`;
-                
+
                 // Retry the original request
                 return api(originalRequest);
             } catch (err) {
