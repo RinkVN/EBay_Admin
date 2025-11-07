@@ -45,7 +45,7 @@ const MONGO_URI = process.env.MONGO_URI;
 
 // Improve MongoDB connection with error handling
 console.log('Connecting to MongoDB...');
-connect(MONGO_URI)
+connect(MONGO_URI, { dbName: 'ebay_admin' })
   .then(() => console.log('MongoDB connected successfully'))
   .catch(err => {
     console.error('MongoDB connection error:', err);
