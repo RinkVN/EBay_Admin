@@ -51,7 +51,7 @@ exports.getAllUsers = async (req, res) => {
     // Filter by search
     if (req.query.search) {
       const searchRegex = { $regex: req.query.search, $options: "i" };
-      
+
       // Try to find users by username/email (excluding admin)
       const foundUsers = await User.find({
         $or: [
@@ -60,10 +60,10 @@ exports.getAllUsers = async (req, res) => {
         ],
         role: { $ne: 'admin' } // Exclude admin in search
       }).select('_id');
-      
+
       // Build search query
       const searchConditions = [];
-      
+
       // Search by user ID (if it's a valid ObjectId)
       if (mongoose.Types.ObjectId.isValid(req.query.search)) {
         const searchId = new mongoose.Types.ObjectId(req.query.search);
@@ -73,13 +73,13 @@ exports.getAllUsers = async (req, res) => {
           searchConditions.push({ _id: searchId });
         }
       }
-      
+
       // Search by found user IDs
       if (foundUsers.length > 0) {
         const userIds = foundUsers.map(u => u._id);
         searchConditions.push({ _id: { $in: userIds } });
       }
-      
+
       if (searchConditions.length > 0) {
         // Use $and to combine role exclusion with search
         query.$and = [
@@ -216,7 +216,7 @@ exports.approveUser = async (req, res) => {
     // Send email notification
     if (user.email) {
       let emailSubject, emailText;
-      
+
       if (approved) {
         // Email thông báo duyệt tài khoản
         emailSubject = "Tài khoản của bạn đã được duyệt";
@@ -225,14 +225,14 @@ exports.approveUser = async (req, res) => {
         // Email thông báo từ chối tài khoản
         emailSubject = "Tài khoản của bạn chưa được duyệt";
         emailText = `Kính gửi ${user.username},\n\nRất tiếc, tài khoản của bạn chưa được duyệt bởi quản trị viên.`;
-        
+
         if (rejectionReason) {
           emailText += `\n\nLý do: ${rejectionReason}`;
         }
-        
+
         emailText += `\n\nVui lòng liên hệ hỗ trợ để biết thêm chi tiết hoặc yêu cầu xem xét lại.\n\nTrân trọng,\nShopii Team`;
       }
-      
+
       try {
         await sendEmail(user.email, emailSubject, emailText);
       } catch (emailError) {
@@ -246,8 +246,8 @@ exports.approveUser = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: approved 
-        ? "Duyệt tài khoản thành công" 
+      message: approved
+        ? "Duyệt tài khoản thành công"
         : "Từ chối tài khoản thành công",
       data: userToReturn,
     });
@@ -473,13 +473,12 @@ exports.updateStoreStatusByAdmin = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: `Cửa hàng đã được ${
-        status === "approved"
-          ? "duyệt"
-          : status === "rejected"
+      message: `Cửa hàng đã được ${status === "approved"
+        ? "duyệt"
+        : status === "rejected"
           ? "từ chối"
           : "chuyển sang chờ duyệt"
-      } thành công`,
+        } thành công`,
       data: store,
     });
   } catch (error) {
@@ -614,14 +613,14 @@ exports.updateProductStatusAdmin = async (req, res) => {
     if (description !== undefined) product.description = description;
     if (price !== undefined) product.price = price;
     if (isAuction !== undefined) product.isAuction = isAuction;
-    
+
     // Only update status if it's provided and valid
     if (status && ["available", "out_of_stock", "pending"].includes(status)) {
       product.status = status;
     }
 
     await product.save();
-    
+
     res.status(200).json({
       success: true,
       message: "Sản phẩm đã được cập nhật thành công",
@@ -709,7 +708,7 @@ exports.getAllOrdersAdmin = async (req, res) => {
     // Filter by search (order ID, buyer username, buyer email)
     if (req.query.search) {
       const searchRegex = { $regex: req.query.search, $options: "i" };
-      
+
       // Try to find buyers by username/email
       const buyers = await User.find({
         $or: [
@@ -717,21 +716,21 @@ exports.getAllOrdersAdmin = async (req, res) => {
           { email: searchRegex }
         ]
       }).select('_id');
-      
+
       // Build search query
       const searchConditions = [];
-      
+
       // Search by order ID (if it's a valid ObjectId)
       if (mongoose.Types.ObjectId.isValid(req.query.search)) {
         searchConditions.push({ _id: new mongoose.Types.ObjectId(req.query.search) });
       }
-      
+
       // Search by buyer IDs
       if (buyers.length > 0) {
         const buyerIds = buyers.map(b => b._id);
         searchConditions.push({ buyerId: { $in: buyerIds } });
       }
-      
+
       if (searchConditions.length > 0) {
         query.$or = searchConditions;
       }
@@ -918,7 +917,7 @@ exports.updateOrderStatusAdmin = async (req, res) => {
 
     // Get buyer info for email notification
     const buyer = await User.findById(order.buyerId).select('email username');
-    
+
     // Send email notification if status changed
     if (buyer && buyer.email) {
       const statusMessages = {
@@ -1679,9 +1678,9 @@ exports.createAdminUser = async (req, res) => {
     // Check if role is valid admin role
     const validAdminRoles = ['admin', 'monitor', 'support', 'finance'];
     if (!role || !validAdminRoles.includes(role)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: `Vai trò phải là một trong: ${validAdminRoles.join(', ')}` 
+      return res.status(400).json({
+        success: false,
+        message: `Vai trò phải là một trong: ${validAdminRoles.join(', ')}`
       });
     }
 
@@ -1739,9 +1738,9 @@ exports.updateUserRole = async (req, res) => {
     // All valid roles (including new admin roles)
     const validRoles = ['buyer', 'seller', 'admin', 'monitor', 'support', 'finance'];
     if (!validRoles.includes(role)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: `Vai trò phải là một trong: ${validRoles.join(', ')}` 
+      return res.status(400).json({
+        success: false,
+        message: `Vai trò phải là một trong: ${validRoles.join(', ')}`
       });
     }
 

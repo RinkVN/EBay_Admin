@@ -97,7 +97,7 @@ const SignIn = () => {
 
       dispatch(setCredentials({ user: response.user, token: response.accessToken || response.token }));
       toast.success('Login successful!');
-      
+
       // Redirect based on user role - admin-level roles (admin, monitor, support, finance)
       const adminRoles = ['admin', 'monitor', 'support', 'finance'];
       if (adminRoles.includes(response.user.role)) {
@@ -105,7 +105,7 @@ const SignIn = () => {
       } else {
         navigate('/'); // Regular users (buyer/seller) to home page
       }
-      
+
     } catch (error) {
       // Check if error response contains account status info
       if (error.response?.data?.accountStatus === 'locked') {

@@ -112,7 +112,7 @@ const router = createBrowserRouter(
         <Route path="/create-dispute/:orderItemId" element={<CreateDisputeForm />}></Route>
         <Route path="/return-requests" element={<ReturnRequestsList />}></Route>
       </Route>
-      
+
       {/* Admin routes - must come BEFORE seller routes to avoid prefix matching issues */}
       <Route path="/admin" element={
         <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.MONITOR, ROLES.SUPPORT, ROLES.FINANCE]}>
@@ -125,35 +125,35 @@ const router = createBrowserRouter(
             <OverviewA />
           </ProtectedRoute>
         }></Route>
-        
+
         {/* Manage Products - Admin only */}
         <Route path="/admin/manage-products" element={
           <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
             <ManageProductA />
           </ProtectedRoute>
         }></Route>
-        
+
         {/* Manage Users - Admin & Support only */}
         <Route path="/admin/manage-users" element={
           <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.SUPPORT]}>
             <ManageUser />
           </ProtectedRoute>
         }></Route>
-        
+
         {/* Manage Stores - Admin & Finance only */}
         <Route path="/admin/manage-stores" element={
           <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FINANCE]}>
             <ManageStore />
           </ProtectedRoute>
         }></Route>
-        
+
         {/* Manage Vouchers - Admin & Support & Finance */}
         <Route path="/admin/manage-vouchers" element={
           <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.SUPPORT, ROLES.FINANCE]}>
             <ManageVoucher />
           </ProtectedRoute>
         }></Route>
-        
+
         {/* Manage Orders - Admin only */}
         <Route path="/admin/manage-orders" element={
           <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
