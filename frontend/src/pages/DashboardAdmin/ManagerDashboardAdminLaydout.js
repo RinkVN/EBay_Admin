@@ -25,6 +25,8 @@ import StoreIcon from "@mui/icons-material/Store";
 import InventoryIcon from "@mui/icons-material/Inventory";
 import LocalOfferIcon from "@mui/icons-material/LocalOffer";
 import DashboardIcon from "@mui/icons-material/Dashboard";
+import RateReviewIcon from '@mui/icons-material/RateReview';
+import GavelIcon from '@mui/icons-material/Gavel';
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
 import Collapse from "@mui/material/Collapse";
@@ -297,6 +299,26 @@ export default function AdminDashboardLayout() {
                 <InventoryIcon />
               </ListItemIcon>
               <ListItemText primary="Manage Products" />
+            </ListItemButton>
+
+            <ListItemButton
+              onClick={() => navigate("/admin/manage-reviews")}
+              selected={currentPath === "/admin/manage-reviews"}
+            >
+              <ListItemIcon sx={{ color: "primary.contrastText" }}>
+                <RateReviewIcon />
+              </ListItemIcon>
+              <ListItemText primary="Manage Reviews" />
+            </ListItemButton>
+
+            <ListItemButton
+              onClick={() => navigate("/admin/manage-disputes")}
+              selected={currentPath === "/admin/manage-disputes"}
+            >
+              <ListItemIcon sx={{ color: "primary.contrastText" }}>
+                <GavelIcon />
+              </ListItemIcon>
+              <ListItemText primary="Manage Disputes" />
             </ListItemButton>
 
             <ListItemButton
