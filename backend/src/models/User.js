@@ -20,6 +20,16 @@ const userSchema = new Schema(
       enum: ["lock", "unlock"],
       default: "unlock",
     },
+    twoFAEnabled: { type: Boolean, default: false },
+    twoFASecret: { type: String },
+    trustedDevices: [
+      {
+        tokenHash: { type: String, required: true },
+        userAgent: { type: String },
+        createdAt: { type: Date, default: Date.now },
+        expiresAt: { type: Date, required: true }
+      }
+    ],
   },
   { timestamps: true }
 );

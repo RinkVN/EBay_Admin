@@ -7,6 +7,7 @@ const {
   authorizeRoles,
   isAdmin,
 } = require("../middleware/auth.middleware");
+const adminAccessGuard = require('../middleware/adminAccessGuard');
 
 // Import các controller functions từ adminController
 const {

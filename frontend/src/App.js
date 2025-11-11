@@ -61,7 +61,7 @@ import ManageVoucher from "./pages/DashboardAdmin/ManageVoucher/ManageVoucher";
 import AdminDashboardLayout from "./pages/DashboardAdmin/ManagerDashboardAdminLaydout";
 import ProtectedRoute from './components/ProtectedRoute';
 import { ROLES } from './utils/roles';
-
+import AdminSetup2FA from "./pages/AdminSetup2FA.jsx";
 
 const Layout = () => {
   return (
@@ -170,6 +170,7 @@ const router = createBrowserRouter(
       </Route>
 
       <Route path="/signin" element={<SignIn />}></Route>
+      <Route path="/admin/setup-2fa" element={<AdminSetup2FA />}></Route>
       <Route path="/signup" element={<SignUp />}></Route>
       <Route path="/store-registration" element={<StoreRegistration />}></Route>
       <Route path="/forgot-password" element={<ForgotPassword />}></Route>

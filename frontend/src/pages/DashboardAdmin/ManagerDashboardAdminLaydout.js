@@ -8,7 +8,7 @@ import Toolbar from "@mui/material/Toolbar";
 import List from "@mui/material/List";
 import Typography from "@mui/material/Typography";
 import Divider from "@mui/material/Divider";
-import { Chip, Avatar, Badge, Paper, Tooltip } from "@mui/material";
+import { Chip, Avatar, Paper, Tooltip } from "@mui/material";
 import IconButton from "@mui/material/IconButton";
 import Container from "@mui/material/Container";
 import ListItemButton from "@mui/material/ListItemButton";
@@ -34,19 +34,13 @@ import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import LocalOfferIcon from "@mui/icons-material/LocalOffer"; // Icon cho Voucher
 
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { useState } from "react";
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import { useSelector } from "react-redux";
 
 function Copyright(props) {
   return (
-    <Typography
-      variant="body2"
-      color="text.secondary"
-      align="center"
-      {...props}
-    >
+    <Typography variant="body2" color="text.secondary" align="center" {...props}>
       {"Copyright © "}
       <Link color="inherit" href="#!">
         SDN Company
@@ -63,11 +57,12 @@ const AppBar = styled(MuiAppBar, {
   shouldForwardProp: (prop) => prop !== "open",
 })(({ theme, open }) => ({
   zIndex: theme.zIndex.drawer + 1,
+  backgroundColor: "#424242", // Màu xám đậm
+  color: "#fff",
   transition: theme.transitions.create(["width", "margin"], {
     easing: theme.transitions.easing.sharp,
     duration: theme.transitions.duration.leavingScreen,
   }),
-  boxShadow: "0 4px 20px 0 rgba(0,0,0,0.1)",
   ...(open && {
     marginLeft: drawerWidth,
     width: `calc(100% - ${drawerWidth}px)`,
@@ -85,8 +80,8 @@ const Drawer = styled(MuiDrawer, {
     position: "relative",
     whiteSpace: "nowrap",
     width: drawerWidth,
-    background: theme.palette.primary.main,
-    color: theme.palette.primary.contrastText,
+    backgroundColor: "#424242", // 🔹 Màu xám đậm giống AppBar
+    color: "#ffffff", // Chữ trắng
     transition: theme.transitions.create("width", {
       easing: theme.transitions.easing.sharp,
       duration: theme.transitions.duration.enteringScreen,
@@ -110,16 +105,10 @@ const Drawer = styled(MuiDrawer, {
 const customTheme = createTheme({
   palette: {
     primary: {
-      main: "#1a237e", // Deep indigo
+      main: "#1a237e",
       light: "#534bae",
       dark: "#000051",
       contrastText: "#ffffff",
-    },
-    secondary: {
-      main: "#ff6f00", // Amber
-      light: "#ffa040",
-      dark: "#c43e00",
-      contrastText: "#000000",
     },
     background: {
       default: "#f5f7fa",
@@ -127,37 +116,8 @@ const customTheme = createTheme({
   },
   typography: {
     fontFamily: "'Roboto', 'Helvetica', 'Arial', sans-serif",
-    h5: {
-      fontWeight: 600,
-    },
-    h6: {
-      fontWeight: 600,
-    },
-  },
-  components: {
-    MuiListItemButton: {
-      styleOverrides: {
-        root: {
-          "&.Mui-selected": {
-            backgroundColor: "rgba(255, 255, 255, 0.12)",
-            "&:hover": {
-              backgroundColor: "rgba(255, 255, 255, 0.2)",
-            },
-          },
-          "&:hover": {
-            backgroundColor: "rgba(255, 255, 255, 0.08)",
-          },
-        },
-      },
-    },
-    MuiCard: {
-      styleOverrides: {
-        root: {
-          borderRadius: "12px",
-          boxShadow: "0 4px 12px 0 rgba(0,0,0,0.05)",
-        },
-      },
-    },
+    h5: { fontWeight: 600 },
+    h6: { fontWeight: 600 },
   },
 });
 
@@ -178,41 +138,53 @@ export default function AdminDashboardLayout() {
   const currentPath = location.pathname;
 
   useEffect(() => {
-    // Fetch admin dashboard stats
-    axios
-      .get("http://localhost:9999/api/admin/report", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("accessToken") || ""}`,
-        },
-      })
-      .then((res) => {
-        if (res.data.success) {
+    const token = localStorage.getItem("accessToken") || "";
+
+    // Gọi song song hai API
+    const fetchData = async () => {
+      try {
+        const [reportRes, profileRes] = await Promise.all([
+          axios.get("http://localhost:9999/api/admin/report", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          axios.get("http://localhost:9999/api/profile", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
+
+        // Xử lý admin/report
+        if (!reportRes.data.success) {
+          console.warn("Không lấy được báo cáo admin");
+        }
+
+        // Xử lý profile
+        if (profileRes.data.success && profileRes.data.data) {
+          const profile = profileRes.data.data;
           setAdminInfo({
-            totalUsers: res.data.data.totalUsers,
-            totalSellers: res.data.data.totalSellers,
-            totalProducts: res.data.data.totalProducts,
-            totalOrders: res.data.data.totalOrders,
-            summary: `Users: ${res.data.data.totalUsers}, Sellers: ${res.data.data.totalSellers}`,
-            // Giả định avatar admin
-            avatarURL: "https://randomuser.me/api/portraits/men/41.jpg",
-            fullname: "Admin User"
+            avatarURL: profile.avatarURL,
+            username: profile.username,
+            fullname: profile.fullname,
+            role: profile.role,
           });
         } else {
           setAdminInfo(null);
         }
-      })
-      .catch(() => setAdminInfo(null));
+      } catch (error) {
+        console.error("Lỗi khi tải dữ liệu admin:", error);
+        setAdminInfo(null);
+      }
+    };
+
+    fetchData();
   }, []);
 
-  const [openAdminMgmt, setOpenAdminMgmt] = React.useState(
+  const [openAdminMgmt, setOpenAdminMgmt] = useState(
     currentPath.includes("/manage-users") || currentPath.includes("/manage-stores")
   );
-  
-  const handleToggleAdminMgmt = () => {
-    setOpenAdminMgmt((prev) => !prev);
-  };
 
-  const handleSetDashboardTitle = (newDashboardTitle) => {
+  const handleToggleAdminMgmt = () => setOpenAdminMgmt((prev) => !prev);
+
+  const handleSetDashboardTitle = (newDashboardTitle) =>
     setDashboardTitle(newDashboardTitle);
   };
 
@@ -248,90 +220,39 @@ export default function AdminDashboardLayout() {
     <ThemeProvider theme={customTheme}>
       <Box sx={{ display: "flex" }}>
         <CssBaseline />
-        <AppBar position="absolute" open={open} color="default">
-          <Toolbar
-            sx={{
-              pr: "24px",
-              backgroundColor: "white",
-            }}
-          >
+        <AppBar position="absolute" open={open}>
+          <Toolbar sx={{ pr: "24px" }}>
             <IconButton
               edge="start"
               color="inherit"
-              aria-label="open drawer"
               onClick={toggleDrawer}
-              sx={{
-                marginRight: "36px",
-                ...(open && { display: "none" }),
-              }}
+              sx={{ marginRight: "36px", ...(open && { display: "none" }) }}
             >
               <MenuIcon />
             </IconButton>
-            <Typography
-              component="h1"
-              variant="h5"
-              color="primary"
-              noWrap
-              sx={{ flexGrow: 1, fontWeight: "bold" }}
-            >
+            <Typography component="h1" variant="h5" noWrap sx={{ flexGrow: 1, fontWeight: "bold" }}>
               {dashboardTitle}
             </Typography>
-            
-            {/* Notification icon */}
-            <Tooltip title="Notifications">
-              <IconButton color="primary" sx={{ mr: 1 }}>
-                <Badge badgeContent={4} color="secondary">
-                  <NotificationsIcon />
-                </Badge>
-              </IconButton>
-            </Tooltip>
-            
-            {/* Settings icon */}
-            <Tooltip title="Settings">
-              <IconButton color="primary" sx={{ mr: 1 }}>
-                <SettingsIcon />
-              </IconButton>
-            </Tooltip>
-            
-            {/* Help icon */}
-            <Tooltip title="Help">
-              <IconButton color="primary" sx={{ mr: 2 }}>
-                <HelpOutlineIcon />
-              </IconButton>
-            </Tooltip>
-            
-            {adminInfo ? (
-              <Chip
-                avatar={
-                  <Avatar
-                    src={adminInfo.avatarURL || undefined}
-                    alt={adminInfo.fullname || "Admin"}
-                  />
-                }
-                label={adminInfo.fullname || "Admin"}
-                color="primary"
-                variant="outlined"
-                sx={{ 
-                  ml: 1, 
-                  fontWeight: 600, 
-                  fontSize: 16,
-                  "&:hover": {
-                    background: "rgba(26, 35, 126, 0.08)",
-                    cursor: "pointer"
-                  }
-                }}
-              />
-            ) : (
-              <Chip
-                avatar={<Avatar />}
-                label="Loading..."
-                color="primary"
-                variant="outlined"
-                sx={{ ml: 2 }}
-              />
+
+            {adminInfo && (
+              <Tooltip title={adminInfo.fullname} arrow>
+                <Chip
+                  avatar={<Avatar src={adminInfo.avatarURL} alt={adminInfo.fullname} />}
+                  label={adminInfo.username}
+                  color="default"
+                  sx={{
+                    ml: 1,
+                    fontWeight: 600,
+                    fontSize: 16,
+                    backgroundColor: "rgba(255,255,255,0.15)",
+                    color: "white",
+                  }}
+                />
+              </Tooltip>
             )}
           </Toolbar>
         </AppBar>
+
         <Drawer variant="permanent" open={open}>
           <Toolbar
             sx={{
@@ -339,17 +260,18 @@ export default function AdminDashboardLayout() {
               alignItems: "center",
               justifyContent: "space-between",
               px: [1],
-              backgroundColor: "primary.dark",
+              backgroundColor: "#424242",
             }}
           >
             <Typography variant="h6" color="primary.contrastText" sx={{ ml: 1, display: open ? "block" : "none" }}>
               SHOP SDN
             </Typography>
-            <IconButton onClick={toggleDrawer} sx={{ color: "primary.contrastText" }}>
+            <IconButton onClick={toggleDrawer} sx={{ color: "white" }}>
               <ChevronLeftIcon />
             </IconButton>
           </Toolbar>
           <Divider sx={{ borderColor: "rgba(255,255,255,0.1)" }} />
+
           <List component="nav">
             <React.Fragment>
               {/* Dashboard Overview - All roles */}
@@ -451,7 +373,6 @@ export default function AdminDashboardLayout() {
                 </ListItemButton>
               )}
 
-            </React.Fragment>
             <Divider sx={{ my: 1, borderColor: "rgba(255,255,255,0.1)" }} />
             <React.Fragment>
               <ListItemButton onClick={handleOnclickSignout}>
@@ -463,6 +384,7 @@ export default function AdminDashboardLayout() {
             </React.Fragment>
           </List>
         </Drawer>
+
         <Box
           component="main"
           sx={{
@@ -479,7 +401,7 @@ export default function AdminDashboardLayout() {
                 p: 3,
                 borderRadius: "12px",
                 boxShadow: "0 4px 20px 0 rgba(0,0,0,0.05)",
-                mb: 3
+                mb: 3,
               }}
             >
               <Outlet context={{ handleSetDashboardTitle }} />
