@@ -57,6 +57,7 @@ const {
   getAllReturnRequestsAdmin,
   approveReturnRequestAdmin,
   rejectReturnRequestAdmin,
+  updateReturnRequestAdmin,
   // Review and Feedback Moderation
   getAllReviewsAdmin,
   deleteReviewByAdmin,
@@ -116,7 +117,7 @@ router.get("/products/:id/reviews", getProductReviewsAndStats);
 router.get("/return-requests", getAllReturnRequestsAdmin);
 router.put("/return-requests/:id/approve", approveReturnRequestAdmin);
 router.put("/return-requests/:id/reject", rejectReturnRequestAdmin);
-
+router.put("/return-requests/:id", updateReturnRequestAdmin);
 // --- Review and Feedback Moderation Routes ---
 router.get("/reviews", getAllReviewsAdmin); // danh sách đánh giá
 router.delete("/reviews/:id", deleteReviewAdmin); // xoá đánh giá theo ID

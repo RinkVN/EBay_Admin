@@ -29,7 +29,7 @@ const STATUS_OPTIONS = [
 
 export default function ManageReturnRequest() {
     const { handleSetDashboardTitle } = useOutletContext();
-    useEffect(() => { handleSetDashboardTitle("Manage Return Requests") }, [handleSetDashboardTitle]);
+    useEffect(() => { handleSetDashboardTitle("Manage Return equests") }, [handleSetDashboardTitle]);
 
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(false);

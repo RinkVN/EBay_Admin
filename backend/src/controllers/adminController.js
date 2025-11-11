@@ -964,7 +964,51 @@ exports.rejectReturnRequestAdmin = async (req, res) => {
     handleError(res, error, "Lỗi khi từ chối yêu cầu hoàn trả");
   }
 };
+exports.updateReturnRequestAdmin = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
 
+    // Kiểm tra giá trị hợp lệ
+    if (!status || !["pending", "approved", "rejected", "completed"].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Trạng thái không hợp lệ (pending, approved, rejected, completed)",
+      });
+    }
+
+    // Tìm yêu cầu hoàn trả
+    const request = await ReturnRequest.findById(id)
+      .populate("userId", "username email")
+      .populate("orderItemId");
+
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy yêu cầu hoàn trả",
+      });
+    }
+
+    // Cập nhật trạng thái
+    request.status = status;
+    await request.save();
+
+    // Có thể thêm logic xử lý hoàn tiền / cập nhật đơn hàng nếu cần
+    // if (status === "approved") { ... }
+
+    res.status(200).json({
+      success: true,
+      message: `Đã cập nhật trạng thái yêu cầu hoàn trả thành "${status}"`,
+      data: request,
+    });
+  } catch (error) {
+    console.error("Error updating return request:", error);
+    res.status(500).json({
+      success: false,
+      message: "Lỗi khi cập nhật yêu cầu hoàn trả",
+    });
+  }
+};
 exports.getAdminReport = async (req, res) => {
   const { period } = req.query;
   try {
