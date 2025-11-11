@@ -10,7 +10,6 @@ import Footer from "./components/home/Footer/Footer";
 import FooterBottom from "./components/home/Footer/FooterBottom";
 import Header from "./components/home/Header/Header";
 import HeaderBottom from "./components/home/Header/HeaderBottom";
-import SpecialCase from "./components/SpecialCase/SpiecialCase.jsx";
 
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
@@ -29,7 +28,6 @@ import { useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { fetchCart } from "./redux/slices/cart.slice";
 
-import { Provider } from 'react-redux';
 import 'react-toastify/dist/ReactToastify.css';
 
 import SignIn from "./pages/SignIn.jsx";
@@ -61,6 +59,8 @@ import ManageStore from "./pages/DashboardAdmin/ManageShop/ManageStore";
 import ManageProductA from "./pages/DashboardAdmin/ManageProduct/ManageProduct";
 import ManageVoucher from "./pages/DashboardAdmin/ManageVoucher/ManageVoucher";
 import AdminDashboardLayout from "./pages/DashboardAdmin/ManagerDashboardAdminLaydout";
+import ProtectedRoute from './components/ProtectedRoute';
+import { ROLES } from './utils/roles';
 
 
 const Layout = () => {
@@ -110,7 +110,54 @@ const router = createBrowserRouter(
         <Route path="/return-requests" element={<ReturnRequestsList />}></Route>
       </Route>
       
-      <Route path="/" element={<ManagerDashboardSellerLaydout />} errorElement={<ErrorPage />}>
+      {/* Admin routes - must come BEFORE seller routes to avoid prefix matching issues */}
+      <Route path="/admin" element={
+        <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.MONITOR, ROLES.SUPPORT, ROLES.FINANCE]}>
+          <AdminDashboardLayout />
+        </ProtectedRoute>
+      }>
+        {/* Overview - All admin-level can view */}
+        <Route path="/admin" element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.MONITOR, ROLES.SUPPORT, ROLES.FINANCE]}>
+            <OverviewA />
+          </ProtectedRoute>
+        }></Route>
+        
+        {/* Manage Products - Admin only */}
+        <Route path="/admin/manage-products" element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+            <ManageProductA />
+          </ProtectedRoute>
+        }></Route>
+        
+        {/* Manage Users - Admin & Support only */}
+        <Route path="/admin/manage-users" element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.SUPPORT]}>
+            <ManageUser />
+          </ProtectedRoute>
+        }></Route>
+        
+        {/* Manage Stores - Admin & Finance only */}
+        <Route path="/admin/manage-stores" element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.FINANCE]}>
+            <ManageStore />
+          </ProtectedRoute>
+        }></Route>
+        
+        {/* Manage Vouchers - Admin & Support & Finance */}
+        <Route path="/admin/manage-vouchers" element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.SUPPORT, ROLES.FINANCE]}>
+            <ManageVoucher />
+          </ProtectedRoute>
+        }></Route>
+      </Route>
+
+      {/* Seller/Dashboard routes - protected to prevent buyer access */}
+      <Route path="/" element={
+        <ProtectedRoute allowedRoles={[ROLES.SELLER]}>
+          <ManagerDashboardSellerLaydout />
+        </ProtectedRoute>
+      } errorElement={<ErrorPage />}>
         <Route path="overview" element={<Overview />}></Route>
         <Route path="manage-product" element={<ManageProduct />}></Route>
         <Route path="manage-inventory" element={<ManageInventory />} />
@@ -120,17 +167,6 @@ const router = createBrowserRouter(
         <Route path="manage-shipping" element={<ManageShipping />}></Route>
         <Route path="manage-dispute" element={<ManageDispute />} />
         <Route path="manage-return-request" element={<ManageReturnRequest />} />
-      </Route>
-
-       <Route path="/admin" element={<AdminDashboardLayout />}>
-        <Route path="/admin" element={<OverviewA />}></Route>
-        <Route
-          path="/admin/manage-products"
-          element={<ManageProductA />}
-        ></Route>
-        <Route path="/admin/manage-users" element={<ManageUser />}></Route>
-        <Route path="/admin/manage-stores" element={<ManageStore />}></Route>
-        <Route path="/admin/manage-vouchers" element={<ManageVoucher />}></Route>
       </Route>
 
       <Route path="/signin" element={<SignIn />}></Route>

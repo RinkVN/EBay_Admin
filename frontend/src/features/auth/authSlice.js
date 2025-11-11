@@ -6,11 +6,11 @@ const getInitialState = () => {
   try {
     const token = localStorage.getItem('token');
     if (token) {
-      const decoded = jwtDecode(token);
+  const decoded = jwtDecode(token);
       return {
         user: {
           id: decoded.id,
-          username: decoded.username,
+          username: decoded.username || decoded.userName || null,
           role: decoded.role,
         },
         token,

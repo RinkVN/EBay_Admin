@@ -6,10 +6,9 @@ import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Pagination from "@mui/material/Pagination";
 import Stack from "@mui/material/Stack";
-import { useNavigate } from "react-router-dom";
+ 
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
-import Tooltip from "@mui/material/Tooltip";
 import {
   Alert,
   Box,
@@ -37,7 +36,7 @@ import {
   Card,
   CardContent,
   Divider,
-  useTheme,
+  
   Menu,
   MenuItem,
   ListItemIcon,
@@ -45,6 +44,8 @@ import {
   Badge,
 } from "@mui/material";
 import axios from "axios";
+import { useSelector } from 'react-redux';
+import { hasPermission, PERMISSIONS } from '../../../utils/roles';
 import UpdateUser from "./UpdateUser";
 import FilterAltIcon from "@mui/icons-material/FilterAlt";
 import ClearAllIcon from "@mui/icons-material/ClearAll";
@@ -55,7 +56,6 @@ import StorefrontIcon from "@mui/icons-material/Storefront";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import LockPersonIcon from "@mui/icons-material/LockPerson";
 import LockOpenIcon from "@mui/icons-material/LockOpen";
-import BlockIcon from "@mui/icons-material/Block";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import Title from "../Title";
 
@@ -105,8 +105,7 @@ const RoleIcon = ({ role }) => {
 };
 
 export default function Users({ users: initialUsers, onUserUpdated }) {
-  const navigate = useNavigate();
-  const theme = useTheme();
+  
   const [deletingUser, setDeletingUser] = React.useState(null);
   const [editingUser, setEditingUser] = React.useState(null);
   const [snackbar, setSnackbar] = React.useState({
@@ -240,6 +239,11 @@ export default function Users({ users: initialUsers, onUserUpdated }) {
     }
     handleCloseActionMenu();
   };
+
+  // Permissions from current logged-in user
+  const auth = useSelector((state) => state.auth);
+  const currentRole = auth?.user?.role;
+  const canManageUsers = hasPermission(currentRole, PERMISSIONS.MANAGE_USERS) || currentRole === 'admin';
 
   return (
     <React.Fragment>
@@ -606,13 +610,15 @@ export default function Users({ users: initialUsers, onUserUpdated }) {
           <ListItemText>View Details</ListItemText>
         </MenuItem>
         <Divider />
-        <MenuItem onClick={() => handleUserAction('delete')}>
+        {canManageUsers && (
+          <MenuItem onClick={() => handleUserAction('delete')}>
           <ListItemIcon>
             <DeleteIcon fontSize="small" color="error" />
           </ListItemIcon>
           <ListItemText>Delete User</ListItemText>
-        </MenuItem>
-        {selectedUser?.action === 'unlock' && (
+          </MenuItem>
+        )}
+        {selectedUser?.action === 'unlock' && canManageUsers && (
           <MenuItem onClick={() => handleUserAction('lock')}>
             <ListItemIcon>
               <LockPersonIcon fontSize="small" color="warning" />
@@ -620,7 +626,7 @@ export default function Users({ users: initialUsers, onUserUpdated }) {
             <ListItemText>Lock Account</ListItemText>
           </MenuItem>
         )}
-        {selectedUser?.action === 'lock' && (
+        {selectedUser?.action === 'lock' && canManageUsers && (
           <MenuItem onClick={() => handleUserAction('unlock')}>
             <ListItemIcon>
               <LockOpenIcon fontSize="small" color="success" />

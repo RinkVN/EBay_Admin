@@ -10,7 +10,8 @@ const userSchema = new Schema(
     password: { type: String, required: true },
     role: {
       type: String,
-      enum: ["buyer", "seller", "admin"],
+      // Extended roles: keep legacy values and add specific admin roles
+      enum: ["buyer", "seller", "admin", "monitor", "support", "finance"],
       default: "buyer",
     },
     avatarURL: { type: String },

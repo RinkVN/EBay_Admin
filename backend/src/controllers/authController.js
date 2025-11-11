@@ -36,8 +36,9 @@ exports.register = async (req, res) => {
     if (password.length < 6) {
       return res.status(400).json({ success: false, message: "Mật khẩu phải dài ít nhất 6 ký tự" });
     }
+    // Allow buyer/seller for self-registration; admin roles only via admin endpoints
     if (role && !["buyer", "seller"].includes(role)) {
-      return res.status(400).json({ success: false, message: "Vai trò không hợp lệ" });
+      return res.status(400).json({ success: false, message: "Vai trò không hợp lệ. Chỉ có thể đăng ký với vai trò buyer hoặc seller" });
     }
 
     // Kiểm tra xem người dùng đã tồn tại chưa
@@ -146,35 +147,53 @@ exports.forgotPassword = async (req, res) => {
 };
 
 // Thay đổi vai trò người dùng
+const { ROLES: APP_ROLES, ADMIN_ROLES } = require('../middleware/rbac');
+
+// Change role: If user is admin-level, they can change to any defined role (for other users via admin endpoints).
+// If a regular user calls this endpoint to change their own role, allow only switching between buyer/seller.
 exports.changeRole = async (req, res) => {
   try {
-    const { role } = req.body;
-    const userId = req.user.id; // Lấy ID người dùng từ middleware xác thực
+    const { role, userId: targetUserId } = req.body;
+    const callerId = req.user.id; // caller ID from auth middleware
+    const callerRole = req.user.role;
 
-    // Kiểm tra đầu vào
+    // Basic validation
     if (!role) {
-      return res.status(400).json({ success: false, message: "Vai trò mới là bắt buộc" });
-    }
-    if (!["buyer", "seller"].includes(role)) {
-      return res.status(400).json({ success: false, message: "Vai trò không hợp lệ" });
+      return res.status(400).json({ success: false, message: 'Vai trò mới là bắt buộc' });
     }
 
-    // Tìm và cập nhật người dùng
-    const user = await User.findById(userId);
+    // Determine target user (if admin changes someone else)
+    const effectiveUserId = targetUserId || callerId;
+
+    // If caller is admin-level, allow any role defined in APP_ROLES
+    if (ADMIN_ROLES.includes(callerRole)) {
+      if (!Object.values(APP_ROLES).includes(role)) {
+        return res.status(400).json({ success: false, message: 'Vai trò không hợp lệ' });
+      }
+    } else {
+      // Non-admins can only switch between buyer and seller for themselves
+      if (effectiveUserId !== callerId) {
+        return res.status(403).json({ success: false, message: 'Chỉ admin mới có quyền thay đổi vai trò người khác' });
+      }
+      if (![APP_ROLES.BUYER, APP_ROLES.SELLER].includes(role)) {
+        return res.status(400).json({ success: false, message: 'Vai trò không hợp lệ. Chỉ được đổi giữa buyer/seller' });
+      }
+    }
+
+    // Find and update user
+    const user = await User.findById(effectiveUserId);
     if (!user) {
-      return res.status(404).json({ success: false, message: "Không tìm thấy người dùng" });
+      return res.status(404).json({ success: false, message: 'Không tìm thấy người dùng' });
     }
 
-    // Cập nhật vai trò
     user.role = role;
     await user.save();
 
-    // Tạo JWT token mới với vai trò đã cập nhật
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "1d" }
-    );
+    // If the caller changed their own role, issue a fresh token
+    let token = null;
+    if (effectiveUserId.toString() === callerId.toString()) {
+      token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1d' });
+    }
 
     res.json({
       success: true,
@@ -187,8 +206,8 @@ exports.changeRole = async (req, res) => {
       },
     });
   } catch (error) {
-    logger.error("Lỗi thay đổi vai trò:", error);
-    res.status(500).json({ success: false, message: "Lỗi server" });
+    logger.error('Lỗi thay đổi vai trò:', error);
+    res.status(500).json({ success: false, message: 'Lỗi server' });
   }
 };
 

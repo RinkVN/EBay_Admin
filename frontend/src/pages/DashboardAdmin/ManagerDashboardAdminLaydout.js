@@ -14,27 +14,20 @@ import Container from "@mui/material/Container";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
-import ListSubheader from "@mui/material/ListSubheader";
-import AccountBoxIcon from "@mui/icons-material/AccountBox";
-import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
 import Link from "@mui/material/Link";
 import MenuIcon from "@mui/icons-material/Menu";
+import MeetingRoomIcon from "@mui/icons-material/MeetingRoom";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import AuthenService from "../../services/api/AuthenService";
 import { resetUserInfo } from "../../redux/slices/orebi.slice";
 import { useDispatch } from "react-redux";
-import PeopleIcon from "@mui/icons-material/People"; // Manage Users
-import WidgetsIcon from "@mui/icons-material/Widgets"; // Manage Products
-import FeedbackIcon from "@mui/icons-material/Feedback"; // Manage Disputes
-import ReceiptLongIcon from "@mui/icons-material/ReceiptLong"; // Manage Orders
+import PeopleIcon from "@mui/icons-material/People";
 import Collapse from "@mui/material/Collapse";
 import DashboardIcon from "@mui/icons-material/Dashboard"; // Dashboard Overview
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
 import StoreIcon from "@mui/icons-material/Store";
 import InventoryIcon from "@mui/icons-material/Inventory";
-import AssignmentReturnIcon from "@mui/icons-material/AssignmentReturn";
-import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 import SettingsIcon from "@mui/icons-material/Settings";
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
@@ -44,6 +37,7 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useState } from "react";
 import { useEffect } from "react";
 import axios from "axios";
+import { useSelector } from "react-redux";
 
 function Copyright(props) {
   return (
@@ -171,6 +165,8 @@ export default function AdminDashboardLayout() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
+  const auth = useSelector((state) => state.auth);
+  const userRole = auth?.user?.role;
   const [dashboardTitle, setDashboardTitle] = React.useState("Admin Dashboard");
   const [open, setOpen] = React.useState(true);
   const toggleDrawer = () => {
@@ -218,6 +214,12 @@ export default function AdminDashboardLayout() {
 
   const handleSetDashboardTitle = (newDashboardTitle) => {
     setDashboardTitle(newDashboardTitle);
+  };
+
+  // Check if user can access a specific menu item based on role
+  const canAccess = (requiredRoles) => {
+    if (!userRole) return false;
+    return requiredRoles.includes(userRole);
   };
 
   const handleOnclickOverview = () => {
@@ -341,7 +343,7 @@ export default function AdminDashboardLayout() {
             }}
           >
             <Typography variant="h6" color="primary.contrastText" sx={{ ml: 1, display: open ? "block" : "none" }}>
-              SHOPII Admin
+              SHOP SDN
             </Typography>
             <IconButton onClick={toggleDrawer} sx={{ color: "primary.contrastText" }}>
               <ChevronLeftIcon />
@@ -350,6 +352,7 @@ export default function AdminDashboardLayout() {
           <Divider sx={{ borderColor: "rgba(255,255,255,0.1)" }} />
           <List component="nav">
             <React.Fragment>
+              {/* Dashboard Overview - All roles */}
               <ListItemButton 
                 onClick={handleOnclickOverview} 
                 selected={currentPath === "/admin"}
@@ -360,85 +363,97 @@ export default function AdminDashboardLayout() {
                 <ListItemText primary="Dashboard Overview" primaryTypographyProps={{ fontWeight: currentPath === "/admin" ? 'bold' : 'normal' }} />
               </ListItemButton>
               
-              <ListItemButton onClick={handleToggleAdminMgmt}>
-                <ListItemIcon sx={{ color: "primary.contrastText" }}>
-                  <PeopleIcon />
-                </ListItemIcon>
-                <ListItemText primary="User Management" />
-                {openAdminMgmt ? <ExpandLess sx={{ color: "primary.contrastText" }} /> : <ExpandMore sx={{ color: "primary.contrastText" }} />}
-              </ListItemButton>
-              
-              <Collapse in={openAdminMgmt} timeout="auto" unmountOnExit>
-                <List component="div" disablePadding>
-                  <ListItemButton 
-                    sx={{ pl: 4 }} 
-                    onClick={handleOnclickUsers}
-                    selected={currentPath === "/admin/manage-users"}
-                  >
+              {/* User Management - Admin & Support only */}
+              {canAccess(['admin', 'support']) && (
+                <>
+                  <ListItemButton onClick={handleToggleAdminMgmt}>
                     <ListItemIcon sx={{ color: "primary.contrastText" }}>
                       <PeopleIcon />
                     </ListItemIcon>
-                    <ListItemText 
-                      primary="Manage Users" 
-                      primaryTypographyProps={{ 
-                        fontWeight: currentPath === "/admin/manage-users" ? 'bold' : 'normal' 
-                      }}
-                    />
+                    <ListItemText primary="User Management" />
+                    {openAdminMgmt ? <ExpandLess sx={{ color: "primary.contrastText" }} /> : <ExpandMore sx={{ color: "primary.contrastText" }} />}
                   </ListItemButton>
                   
-                  <ListItemButton 
-                    sx={{ pl: 4 }} 
-                    onClick={handleOnclickStores}
-                    selected={currentPath === "/admin/manage-stores"}
-                  >
-                    <ListItemIcon sx={{ color: "primary.contrastText" }}>
-                      <StoreIcon />
-                    </ListItemIcon>
-                    <ListItemText 
-                      primary="Manage Shops" 
-                      primaryTypographyProps={{ 
-                        fontWeight: currentPath === "/admin/manage-stores" ? 'bold' : 'normal' 
-                      }}
-                    />
-                  </ListItemButton>
-                </List>
-              </Collapse>
+                  <Collapse in={openAdminMgmt} timeout="auto" unmountOnExit>
+                    <List component="div" disablePadding>
+                      <ListItemButton 
+                        sx={{ pl: 4 }} 
+                        onClick={handleOnclickUsers}
+                        selected={currentPath === "/admin/manage-users"}
+                      >
+                        <ListItemIcon sx={{ color: "primary.contrastText" }}>
+                          <PeopleIcon />
+                        </ListItemIcon>
+                        <ListItemText 
+                          primary="Manage Users" 
+                          primaryTypographyProps={{ 
+                            fontWeight: currentPath === "/admin/manage-users" ? 'bold' : 'normal' 
+                          }}
+                        />
+                      </ListItemButton>
+                    </List>
+                  </Collapse>
+                </>
+              )}
               
-              <ListItemButton 
-                onClick={handleOnclickProducts}
-                selected={currentPath === "/admin/manage-products"}
-              >
-                <ListItemIcon sx={{ color: "primary.contrastText" }}>
-                  <InventoryIcon />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="Manage Products" 
-                  primaryTypographyProps={{ 
-                    fontWeight: currentPath === "/admin/manage-products" ? 'bold' : 'normal' 
-                  }}
-                />
-              </ListItemButton>
+              {/* Manage Stores - Admin & Finance only */}
+              {canAccess(['admin', 'finance']) && (
+                <ListItemButton 
+                  sx={{ pl: 4, display: 'block' }} 
+                  onClick={handleOnclickStores}
+                  selected={currentPath === "/admin/manage-stores"}
+                >
+                  <ListItemIcon sx={{ color: "primary.contrastText" }}>
+                    <StoreIcon />
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary="Manage Shops" 
+                    primaryTypographyProps={{ 
+                      fontWeight: currentPath === "/admin/manage-stores" ? 'bold' : 'normal' 
+                    }}
+                  />
+                </ListItemButton>
+              )}
               
-              <ListItemButton 
-                onClick={handleOnclickVouchers}
-                selected={currentPath === "/admin/manage-vouchers"}
-              >
-                <ListItemIcon sx={{ color: "primary.contrastText" }}>
-                  <LocalOfferIcon />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="Manage Vouchers" 
-                  primaryTypographyProps={{ 
-                    fontWeight: currentPath === "/admin/manage-vouchers" ? 'bold' : 'normal' 
-                  }}
-                />
-              </ListItemButton>
+              {/* Manage Products - Admin only */}
+              {canAccess(['admin']) && (
+                <ListItemButton 
+                  onClick={handleOnclickProducts}
+                  selected={currentPath === "/admin/manage-products"}
+                >
+                  <ListItemIcon sx={{ color: "primary.contrastText" }}>
+                    <InventoryIcon />
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary="Manage Products" 
+                    primaryTypographyProps={{ 
+                      fontWeight: currentPath === "/admin/manage-products" ? 'bold' : 'normal' 
+                    }}
+                  />
+                </ListItemButton>
+              )}
+              
+              {/* Manage Vouchers - Admin & Support & Finance */}
+              {canAccess(['admin', 'support', 'finance']) && (
+                <ListItemButton 
+                  onClick={handleOnclickVouchers}
+                  selected={currentPath === "/admin/manage-vouchers"}
+                >
+                  <ListItemIcon sx={{ color: "primary.contrastText" }}>
+                    <LocalOfferIcon />
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary="Manage Vouchers" 
+                    primaryTypographyProps={{ 
+                      fontWeight: currentPath === "/admin/manage-vouchers" ? 'bold' : 'normal' 
+                    }}
+                  />
+                </ListItemButton>
+              )}
 
             </React.Fragment>
             <Divider sx={{ my: 1, borderColor: "rgba(255,255,255,0.1)" }} />
             <React.Fragment>
-
-              
               <ListItemButton onClick={handleOnclickSignout}>
                 <ListItemIcon sx={{ color: "primary.contrastText" }}>
                   <MeetingRoomIcon />

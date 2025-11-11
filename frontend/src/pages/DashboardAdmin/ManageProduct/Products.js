@@ -166,6 +166,7 @@ export default function Products({
   }, [stores, storeSearch]);
 
   // Define rating ranges
+  
   const ratingRanges = [
     { label: ">4", min: 4, max: 5.1 },
     { label: "3 < =<4", min: 3, max: 4 },

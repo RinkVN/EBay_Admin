@@ -57,11 +57,12 @@ const SignIn = () => {
       
       toast.success('Login successful!');
       
-      // Redirect based on user role
-      if (response.user.role === 'admin') {
-        navigate('/admin'); // Admin users to admin overview
+      // Redirect based on user role - admin-level roles (admin, monitor, support, finance)
+      const adminRoles = ['admin', 'monitor', 'support', 'finance'];
+      if (adminRoles.includes(response.user.role)) {
+        navigate('/admin'); // Admin-level users to admin dashboard
       } else {
-        navigate('/'); // Regular users to home page
+        navigate('/'); // Regular users (buyer/seller) to home page
       }
       
     } catch (error) {

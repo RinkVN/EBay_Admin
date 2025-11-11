@@ -61,6 +61,8 @@ const {
 
   // Admin Dashboard
   getAdminReport,
+  createAdminUser,
+  updateUserRole,
 } = require("../controllers/adminController");
 
 const {
@@ -72,15 +74,18 @@ const {
   toggleVoucherActive,
 } = require('../controllers/voucherController');
 
-// Áp dụng middleware xác thực và phân quyền admin cho tất cả các route trong file này
+// Áp dụng middleware xác thực và phân quyền admin-level (admin, monitor, support, finance)
+const { ADMIN_ROLES } = require('../middleware/rbac');
 router.use(authMiddleware);
-router.use(authorizeRoles("admin"));
+router.use(authorizeRoles(...ADMIN_ROLES));
 
 // --- User Management Routes ---
 router.get("/users", getAllUsers);
 router.get("/users/:userId", getUserDetails);
 router.put("/users/:userId", updateUserByAdmin);
-router.delete("/users/:userId", deleteUserByAdmin); // Corrected path to /admin/users/:userId
+router.delete("/users/:userId", deleteUserByAdmin);
+router.put("/users/:userId/role", updateUserRole); // Update user role
+router.post("/create-admin-user", createAdminUser); // Create new admin user with specific role
 // --- Store Management Routes ---
 router.get("/stores", getAllStoresAdmin);
 router.get("/stores/:storeId", getStoreDetails);

@@ -828,6 +828,34 @@ exports.getAdminReport = async (req, res) => {
     const now = new Date();
     let startDate = null;
 
+    // Get products by category count first
+    const productsByCategory = await Product.aggregate([
+      {
+        $lookup: {
+          from: "categories",
+          localField: "categoryId",
+          foreignField: "_id",
+          as: "category"
+        }
+      },
+      { $unwind: "$category" },
+      {
+        $group: {
+          _id: "$category._id",
+          name: { $first: "$category.name" },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } },
+      {
+        $project: {
+          _id: 0,
+          name: 1,
+          count: 1
+        }
+      }
+    ]);
+
     if (period === "week") {
       startDate = new Date();
       startDate.setDate(startDate.getDate() - 7);
@@ -1221,6 +1249,7 @@ exports.getAdminReport = async (req, res) => {
       insights: {
         revenueByCategory,
         topProducts,
+        productsByCategory,
       },
       activities: {
         recentActivity,
@@ -1228,5 +1257,116 @@ exports.getAdminReport = async (req, res) => {
     });
   } catch (error) {
     handleError(res, error, "Lỗi khi lấy báo cáo dashboard");
+  }
+};
+
+// --- Admin User Management ---
+/**
+ * @desc Create a new admin user (by super admin only)
+ * @route POST /api/admin/create-admin-user
+ * @access Private (Admin only)
+ */
+exports.createAdminUser = async (req, res) => {
+  try {
+    const { username, email, password, fullname, role } = req.body;
+    const bcrypt = require('bcryptjs');
+
+    // Validate input
+    if (!username || !email || !password) {
+      return res.status(400).json({ success: false, message: "Username, email, và password là bắt buộc" });
+    }
+
+    // Check if role is valid admin role
+    const validAdminRoles = ['admin', 'monitor', 'support', 'finance'];
+    if (!role || !validAdminRoles.includes(role)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Vai trò phải là một trong: ${validAdminRoles.join(', ')}` 
+      });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ $or: [{ username }, { email }] });
+    if (existingUser) {
+      return res.status(400).json({ success: false, message: "Username hoặc email đã tồn tại" });
+    }
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Create new admin user
+    const newUser = new User({
+      username,
+      email,
+      password: hashedPassword,
+      fullname: fullname || username,
+      role: role, // admin, monitor, support, finance
+      action: 'unlock', // Default unlocked
+    });
+
+    await newUser.save();
+
+    res.status(201).json({
+      success: true,
+      message: `Admin user ${role} created successfully`,
+      user: {
+        id: newUser._id,
+        username: newUser.username,
+        email: newUser.email,
+        role: newUser.role,
+      }
+    });
+  } catch (error) {
+    handleError(res, error, "Lỗi tạo admin user", 500);
+  }
+};
+
+/**
+ * @desc Update user role by admin
+ * @route PUT /api/admin/users/:userId/role
+ * @access Private (Admin only)
+ */
+exports.updateUserRole = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { role } = req.body;
+
+    if (!role) {
+      return res.status(400).json({ success: false, message: "Vai trò là bắt buộc" });
+    }
+
+    // All valid roles (including new admin roles)
+    const validRoles = ['buyer', 'seller', 'admin', 'monitor', 'support', 'finance'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Vai trò phải là một trong: ${validRoles.join(', ')}` 
+      });
+    }
+
+    // Find and update user
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { role },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "Không tìm thấy người dùng" });
+    }
+
+    res.json({
+      success: true,
+      message: `Vai trò người dùng đã được cập nhật thành ${role}`,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+      }
+    });
+  } catch (error) {
+    handleError(res, error, "Lỗi cập nhật vai trò người dùng", 500);
   }
 };

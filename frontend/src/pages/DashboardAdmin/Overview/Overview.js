@@ -5,24 +5,20 @@ import {
   CardContent,
   Typography,
   Box,
-  Divider,
   Select,
   MenuItem,
   FormControl,
   InputLabel,
-  Button,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableRow,
-  Link as MuiLink,
   IconButton,
   Chip,
   Stack,
   LinearProgress,
   Avatar,
-  useTheme,
   Tooltip,
 } from "@mui/material";
 import {
@@ -36,20 +32,10 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Legend,
-  LineChart, 
+  LineChart,
   Line,
-  Radar,
-  RadarChart, 
-  PolarGrid, 
-  PolarAngleAxis, 
-  PolarRadiusAxis,
-  RadialBarChart, 
-  RadialBar
 } from "recharts";
-import { Link } from "react-router-dom";
 import axios from "axios";
-import CustomLegend from "./CustomLegend";
 import { useOutletContext } from "react-router-dom";
 import RefreshIcon from '@mui/icons-material/Refresh';
 import FilterAltIcon from '@mui/icons-material/FilterAlt';
@@ -58,26 +44,20 @@ import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import PeopleIcon from '@mui/icons-material/People';
 import PersonIcon from '@mui/icons-material/Person';
 import LocalShippingIcon from '@mui/icons-material/LocalShipping';
-import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
-import StoreIcon from '@mui/icons-material/Store';
 import TimelineIcon from '@mui/icons-material/Timeline';
 import Title from "../Title";
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 
-// Custom colors for charts
+// Minimal neutral palette for a clean, consistent look
 const COLORS = [
-  "#1a237e", // primary main
-  "#ff6f00", // secondary main
-  "#0288d1", // blue
-  "#43a047", // green
-  "#7b1fa2", // purple
-  "#c62828", // red
-  "#f9a825", // amber
-  "#00897b", // teal
-  "#5d4037", // brown
-  "#455a64", // blueGrey
+  '#0f172a', // dark slate
+  '#334155', // slate
+  '#64748b', // gray-blue
+  '#94a3b8', // light gray-blue
+  '#cbd5e1', // pale
 ];
+const CHART_COLOR = COLORS[0];
 
 const TIME_OPTIONS = [
   { value: "", label: "All Time" },
@@ -86,59 +66,31 @@ const TIME_OPTIONS = [
   { value: "year", label: "Last 12 Months" },
 ];
 
-// Component for stats card
-const StatCard = ({ title, value, icon, color = "primary.main", percentChange = null }) => {
+// Component for stats card (compact, minimal)
+const StatCard = ({ title, value, icon, subtitle = null, percentChange = null }) => {
   return (
-    <Card 
-      sx={{ 
-        height: '100%',
-        position: 'relative',
-        overflow: 'hidden',
-        transition: 'transform 0.2s, box-shadow 0.2s',
-        '&:hover': {
-          transform: 'translateY(-4px)',
-          boxShadow: '0 8px 24px 0 rgba(0,0,0,0.12)'
-        }
-      }}
-    >
-      <Box 
-        sx={{ 
-          position: 'absolute', 
-          top: 0, 
-          right: 0, 
-          width: '30%', 
-          height: '100%', 
-          bgcolor: `${color}15`, 
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center'
-        }}
-      >
-        {icon}
-      </Box>
-      <CardContent sx={{ position: 'relative', zIndex: 1 }}>
-        <Typography variant="body2" color="text.secondary" gutterBottom>
-          {title}
-        </Typography>
-        <Typography variant="h4" color="primary" fontWeight="bold" mb={1}>
-          {value}
-        </Typography>
-        {percentChange !== null && (
-          <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-            {percentChange >= 0 ? (
-              <TrendingUpIcon fontSize="small" color="success" />
-            ) : (
-              <TrendingDownIcon fontSize="small" color="error" />
-            )}
-            <Typography 
-              variant="body2" 
-              color={percentChange >= 0 ? "success.main" : "error.main"}
-              ml={0.5}
-            >
-              {Math.abs(percentChange)}% {percentChange >= 0 ? "increase" : "decrease"}
-            </Typography>
+    <Card sx={{ height: '100%', boxShadow: '0 6px 18px rgba(15,23,42,0.06)', borderRadius: 2 }}>
+      <CardContent>
+        <Stack direction="row" alignItems="center" spacing={2}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 56, height: 56, bgcolor: '#f3f4f6', borderRadius: 1 }}>
+            {icon}
           </Box>
-        )}
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="body2" color="text.secondary">{title}</Typography>
+            <Typography variant="h5" fontWeight={700}>{value}</Typography>
+            {subtitle && <Typography variant="caption" color="text.secondary">{subtitle}</Typography>}
+          </Box>
+          {percentChange !== null && (
+            <Box sx={{ textAlign: 'right' }}>
+              {percentChange >= 0 ? (
+                <TrendingUpIcon fontSize="small" color="success" />
+              ) : (
+                <TrendingDownIcon fontSize="small" color="error" />
+              )}
+              <Typography variant="body2" color={percentChange >= 0 ? 'success.main' : 'error.main'}>{Math.abs(percentChange)}%</Typography>
+            </Box>
+          )}
+        </Stack>
       </CardContent>
     </Card>
   );
@@ -146,14 +98,13 @@ const StatCard = ({ title, value, icon, color = "primary.main", percentChange = 
 
 const Overview = () => {
   const { handleSetDashboardTitle } = useOutletContext();
-  const theme = useTheme();
   const [report, setReport] = useState(null);
   const [period, setPeriod] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    handleSetDashboardTitle("Dashboard Overview");
+    if (handleSetDashboardTitle) handleSetDashboardTitle("Dashboard Overview");
   }, [handleSetDashboardTitle]);
 
   const fetchData = async (selectedPeriod = "") => {
@@ -161,347 +112,318 @@ const Overview = () => {
     setError(null);
     try {
       const res = await axios.get(
-        `http://localhost:9999/api/admin/report${
-          selectedPeriod ? `?period=${selectedPeriod}` : ""
-        }`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("accessToken") || ""}`,
-          },
-        }
+        `http://localhost:9999/api/admin/report${selectedPeriod ? `?period=${selectedPeriod}` : ""}`,
+        { headers: { Authorization: `Bearer ${localStorage.getItem("accessToken") || ""}` } }
       );
-      if (!res.data.success) {
-        throw new Error("API response unsuccessful");
-      }
-      // Calculate percentages for revenueByCategory
-      const revenueByCategory = res.data.insights.revenueByCategory || [];
-      const totalRevenue = revenueByCategory.reduce(
-        (sum, item) => sum + (item.value || 0),
-        0
-      );
-      const revenueByCategoryWithPercent = revenueByCategory.map((item) => ({
-        ...item,
-        value:
-          totalRevenue > 0
-            ? Number(((item.value / totalRevenue) * 100).toFixed(1))
-            : 0,
+      if (!res.data || !res.data.success) throw new Error('API returned unsuccessful');
+
+      // Normalize and compute helpful datasets with safe fallbacks
+      const data = res.data;
+      const summary = data.summary || {};
+      const insights = data.insights || {};
+
+      // orderStatus -> array for pie
+      const rawOrderStatus = summary.orderStatus || {};
+      const orderStatus = Object.entries(rawOrderStatus).map(([name, value]) => ({ name, value }));
+
+      // revenueByCategory: convert to percent share if raw numbers present
+      const revenueByCategoryRaw = insights.revenueByCategory || [];
+      const totalRevenueValue = revenueByCategoryRaw.reduce((s, i) => s + (i.value || 0), 0);
+      const revenueByCategory = revenueByCategoryRaw.map((it) => ({
+        ...it,
+        value: totalRevenueValue > 0 ? Number(((it.value / totalRevenueValue) * 100).toFixed(1)) : (it.value || 0),
       }));
-      // Prepare orderStatus for PieChart
-      const orderStatus = res.data.summary.orderStatus || {};
-      const orderStatusData = Object.entries(orderStatus)
-        .map(([name, value]) => ({
-          name,
-          value,
-        }))
-        .filter((item) => item.value > 0);
+
+      // revenueOverTime fallback
+      const revenueOverTime = insights.revenueOverTime || insights.revenueByDate || [];
+
+      // topProducts, productsByCategory and recentOrders/users
+      const topProducts = insights.topProducts || [];
+      const productsByCategory = insights.productsByCategory || [];
+      const recentOrders = insights.recentOrders || [];
+      const recentUsers = insights.recentUsers || [];
+
+      // include productsByCategory so the ProductsByCategory component receives data
       setReport({
-        ...res.data,
-        insights: {
-          ...res.data.insights,
-          revenueByCategory: revenueByCategoryWithPercent,
-        },
-        summary: {
-          ...res.data.summary,
-          orderStatus: orderStatusData,
-        },
+        summary,
+        insights: { revenueByCategory, revenueOverTime, topProducts, productsByCategory, recentOrders, recentUsers },
+        orderStatus,
       });
-    } catch (error) {
-      console.error("Error fetching report:", error.message);
-      setError("Failed to load data. Please try again.");
+    } catch (err) {
+      console.error('fetch report failed', err?.message || err);
+      setError('Không thể tải dữ liệu. Vui lòng thử lại.');
       setReport(null);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  useEffect(() => {
-    fetchData(period);
-  }, [period]);
+  useEffect(() => { fetchData(period); }, [period]);
 
-  // Định dạng số để hiển thị dấu phân cách hàng nghìn
-  const formatNumber = (num) => {
-    return num?.toLocaleString() || "0";
+  const formatNumber = (num) => (num === 0 ? '0' : (num ? Number(num).toLocaleString() : '-'));
+
+  // Small components for layout
+  const KPISection = () => (
+    <Grid container spacing={2}>
+      <Grid item xs={12} md={4} lg={2}>
+        <StatCard title="Revenue (Shipped)" value={`$${formatNumber(report?.summary?.totalRevenue)}`} icon={<AttachMoneyIcon color="primary" />} percentChange={report?.summary?.revenueChange ?? null} />
+      </Grid>
+      <Grid item xs={12} md={4} lg={2}>
+        <StatCard title="Total Orders" value={formatNumber(report?.summary?.totalOrders)} icon={<ShoppingCartIcon color="secondary" />} percentChange={report?.summary?.ordersChange ?? null} />
+      </Grid>
+      <Grid item xs={12} md={4} lg={2}>
+        <StatCard title="Total Users" value={formatNumber(report?.summary?.totalUsers)} icon={<PeopleIcon sx={{ color: '#64748b' }} />} percentChange={report?.summary?.usersChange ?? null} />
+      </Grid>
+      <Grid item xs={12} md={4} lg={2}>
+        <StatCard title="Unique Customers" value={formatNumber(report?.summary?.uniqueCustomers)} icon={<PersonIcon sx={{ color: '#94a3b8' }} />} />
+      </Grid>
+      <Grid item xs={12} md={4} lg={2}>
+        <StatCard title="Products Shipped" value={formatNumber(report?.summary?.productsShipped)} icon={<LocalShippingIcon sx={{ color: '#cbd5e1' }} />} />
+      </Grid>
+      <Grid item xs={12} md={4} lg={2}>
+        <StatCard title="Conversion" value={`${report?.summary?.conversionRate ?? 0}%`} icon={<TimelineIcon sx={{ color: '#334155' }} />} />
+      </Grid>
+    </Grid>
+  );
+
+  const RevenueOverTime = () => {
+    const data = report?.insights?.revenueOverTime || [];
+    const chartData = data.length ? data : [{ date: 'N/A', revenue: 0 }];
+    return (
+      <Card sx={{ height: '100%', boxShadow: '0 6px 18px rgba(15,23,42,0.06)', borderRadius: 2 }}>
+        <CardContent>
+          <Typography variant="h6">Revenue Over Time</Typography>
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={chartData} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.12} />
+              <XAxis dataKey="date" tick={{ fill: '#475569' }} />
+              <YAxis tick={{ fill: '#475569' }} />
+              <RechartsTooltip formatter={(v) => [`$${formatNumber(v)}`]} />
+              <Line type="monotone" dataKey="revenue" stroke={CHART_COLOR} strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const OrdersStatusPie = () => {
+    const data = report?.orderStatus || [];
+    if (!data.length) return null;
+    return (
+      <Card sx={{ height: '100%', boxShadow: '0 6px 18px rgba(15,23,42,0.06)', borderRadius: 2 }}>
+        <CardContent>
+          <Typography variant="h6">Orders by Status</Typography>
+          <ResponsiveContainer width="100%" height={220}>
+            <PieChart>
+              <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} innerRadius={40} labelLine={false} label={({ name, percent }) => `${name}: ${Math.round(percent * 100)}%`}>
+                {data.map((entry, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+              </Pie>
+              <RechartsTooltip formatter={(v, name) => [v, name]} />
+            </PieChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const RevenueByCategory = () => {
+    const data = report?.insights?.revenueByCategory || [];
+    if (!data.length) return null;
+    return (
+      <Card sx={{ height: '100%', boxShadow: '0 6px 18px rgba(15,23,42,0.06)', borderRadius: 2 }}>
+        <CardContent>
+          <Typography variant="h6">Revenue by Category (%)</Typography>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 20 }}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+              <XAxis dataKey="name" tick={{ fontSize: 12 }} interval={0} angle={-30} textAnchor="end" />
+              <YAxis />
+              <RechartsTooltip formatter={(v) => [`${v}%`, 'Share']} />
+              <Bar dataKey="value" fill={COLORS[0]}>{data.map((d, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}</Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+    );
+  };
+
+
+
+  const ProductsByCategory = () => {
+    const data = report?.insights?.productsByCategory || [];
+    if (!data.length) return null;
+    return (
+      <Card sx={{ height: '100%', boxShadow: '0 6px 18px rgba(15,23,42,0.06)', borderRadius: 2 }}>
+        <CardContent>
+          <Typography variant="h6">Products by Category</Typography>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 20 }}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+              <XAxis dataKey="name" tick={{ fontSize: 12 }} interval={0} angle={-30} textAnchor="end" />
+              <YAxis />
+              <RechartsTooltip formatter={(v) => [`${v}`, 'Products']} />
+              <Bar dataKey="count" fill={CHART_COLOR} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const TopProductsTable = () => {
+    const rows = report?.insights?.topProducts || [];
+    if (!rows.length) return null;
+    return (
+      <Card sx={{ boxShadow: '0 6px 18px rgba(15,23,42,0.06)', borderRadius: 2 }}>
+        <CardContent>
+          <Typography variant="h6">Top Products</Typography>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Product</TableCell>
+                <TableCell>Sold</TableCell>
+                <TableCell>Revenue</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {rows.map((r, i) => (
+                <TableRow key={i} hover>
+                  <TableCell>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <Avatar src={r.image} alt={r.name} sx={{ width: 36, height: 36 }} />
+                      <Typography variant="body2">{r.name}</Typography>
+                    </Stack>
+                  </TableCell>
+                  <TableCell>{r.sold ?? '-'}</TableCell>
+                  <TableCell>{r.revenue ? `$${formatNumber(r.revenue)}` : '-'}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const RecentUsersList = () => {
+    const rows = report?.insights?.recentUsers || [];
+    if (!rows.length) return (
+      <Card sx={{ boxShadow: '0 6px 18px rgba(15,23,42,0.06)', borderRadius: 2 }}>
+        <CardContent><Typography variant="body2" color="text.secondary">No recent users</Typography></CardContent>
+      </Card>
+    );
+    return (
+      <Card sx={{ boxShadow: '0 6px 18px rgba(15,23,42,0.06)', borderRadius: 2 }}>
+        <CardContent>
+          <Typography variant="h6">Recent Users</Typography>
+          <Box sx={{ maxHeight: 260, overflow: 'auto', mt: 1 }}>
+            <Table size="small">
+              <TableBody>
+                {rows.map((u, i) => (
+                  <TableRow key={i} hover>
+                    <TableCell>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Avatar src={u.avatar} alt={u.name} sx={{ width: 30, height: 30 }} />
+                        <Typography variant="body2">{u.name}</Typography>
+                      </Stack>
+                    </TableCell>
+                    <TableCell>{u.type}</TableCell>
+                    <TableCell><Chip size="small" label={u.status} color={u.status === 'active' ? 'success' : 'default'} /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Box>
+        </CardContent>
+      </Card>
+    );
   };
 
   return (
     <Box>
-      {/* Title và các bộ lọc */}
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }}>
-        <Title highlight={true}>Dashboard Analytics</Title>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <FormControl size="small" variant="outlined">
-            <InputLabel id="period-label">Time Period</InputLabel>
-            <Select
-              labelId="period-label"
-              value={period}
-              label="Time Period"
-              onChange={(e) => setPeriod(e.target.value)}
-              sx={{ minWidth: 150 }}
-              startAdornment={<FilterAltIcon sx={{ mr: 1, color: 'text.secondary' }} fontSize="small" />}
-            >
-              {TIME_OPTIONS.map((opt) => (
-                <MenuItem value={opt.value} key={opt.value}>
-                  {opt.label}
-                </MenuItem>
-              ))}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Title highlight>Dashboard Overview</Title>
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          <FormControl size="small">
+            <InputLabel id="period-label">Period</InputLabel>
+            <Select labelId="period-label" value={period} label="Period" onChange={(e) => setPeriod(e.target.value)} sx={{ minWidth: 160 }} startAdornment={<FilterAltIcon sx={{ mr: 1 }} />}>
+              {TIME_OPTIONS.map(o => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
             </Select>
           </FormControl>
-          <Tooltip title="Refresh data">
-            <IconButton
-              color="primary"
-              onClick={() => fetchData(period)}
-              disabled={loading}
-            >
-              <RefreshIcon />
-            </IconButton>
+          <Tooltip title="Refresh">
+            <IconButton onClick={() => fetchData(period)} disabled={loading}><RefreshIcon /></IconButton>
           </Tooltip>
         </Box>
       </Box>
 
       {loading ? (
-        <Box sx={{ width: '100%', mt: 2, mb: 4 }}>
-          <LinearProgress />
-        </Box>
+        <Box sx={{ width: '100%', my: 2 }}><LinearProgress /></Box>
       ) : error ? (
         <Typography color="error">{error}</Typography>
       ) : !report ? (
-        <Typography color="error">No data available</Typography>
+        <Typography color="text.secondary">No data available</Typography>
       ) : (
-        <Grid container spacing={3}>
-          {/* Summary Cards - first row */}
-          <Grid item xs={12} sm={6} md={3}>
-            <StatCard 
-              title="Total Revenue (Shipped)" 
-              value={`$${formatNumber(report.summary.totalRevenue)}`} 
-              icon={<AttachMoneyIcon sx={{ fontSize: 40, color: 'primary.main' }} />} 
-              percentChange={3.7} // Example value
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <StatCard 
-              title="Total Orders" 
-              value={formatNumber(report.summary.totalOrders)} 
-              icon={<ShoppingCartIcon sx={{ fontSize: 40, color: 'secondary.main' }} />} 
-              color="secondary.main"
-              percentChange={2.1} // Example value
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <StatCard 
-              title="Total Users" 
-              value={formatNumber(report.summary.totalUsers)} 
-              icon={<PeopleIcon sx={{ fontSize: 40, color: '#0288d1' }} />} 
-              color="#0288d1"
-              percentChange={5.8} // Example value
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <StatCard 
-              title="Unique Customers" 
-              value={formatNumber(report.summary.uniqueCustomers)} 
-              icon={<PersonIcon sx={{ fontSize: 40, color: '#43a047' }} />} 
-              color="#43a047"
-              percentChange={-1.2} // Example value
-            />
-          </Grid>
-          
-          {/* Summary Cards - second row */}
-          <Grid item xs={12} sm={6} md={3}>
-            <StatCard 
-              title="Products Shipped" 
-              value={formatNumber(report.summary.productsShipped)} 
-              icon={<LocalShippingIcon sx={{ fontSize: 40, color: '#7b1fa2' }} />} 
-              color="#7b1fa2"
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <StatCard 
-              title="Active Buyers" 
-              value={formatNumber(report.summary.activeBuyers)} 
-              icon={<PersonOutlineIcon sx={{ fontSize: 40, color: '#c62828' }} />} 
-              color="#c62828"
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <StatCard 
-              title="Active Sellers" 
-              value={formatNumber(report.summary.activeSellers)} 
-              icon={<StoreIcon sx={{ fontSize: 40, color: '#f9a825' }} />} 
-              color="#f9a825"
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <StatCard 
-              title="Conversion Rate" 
-              value={`${report.summary.conversionRate || 0}%`} 
-              icon={<TimelineIcon sx={{ fontSize: 40, color: '#00897b' }} />} 
-              color="#00897b"
-            />
+        <Grid container spacing={2}>
+          <Grid item xs={12}>{KPISection()}</Grid>
+
+          <Grid item xs={12} md={6} lg={6}>
+            <RevenueOverTime />
           </Grid>
 
-          {/* Order Status Breakdown */}
-          {report.summary.orderStatus?.length > 0 && (
-            <Grid item xs={12} md={6} lg={4}>
-              <Card sx={{ height: 420 }}>
-                <CardContent
-                  sx={{
-                    height: '100%',
-                    display: "flex",
-                    flexDirection: "column",
-                    p: 3,
-                    "&:last-child": { pb: 3 },
-                  }}
-                >
-                  <Title highlight={false}>Order Status Breakdown</Title>
-                  <Box sx={{ flexGrow: 1, minHeight: 250, mt: 2 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={report.summary.orderStatus}
-                          dataKey="value"
-                          nameKey="name"
-                          cx="50%"
-                          cy="50%"
-                          outerRadius={80}
-                          innerRadius={40} // Donut chart
-                          label={({ name, value }) => `${value}`}
-                          labelLine={false}
-                        >
-                          {report.summary.orderStatus.map((entry, index) => (
-                            <Cell
-                              key={`status-${index}`}
-                              fill={COLORS[index % COLORS.length]}
-                            />
-                          ))}
-                        </Pie>
-                        <RechartsTooltip formatter={(value, name) => [`${value}`, `${name}`]} />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </Box>
-                  <Box sx={{ mt: 2 }}>
-                    <CustomLegend items={report.summary.orderStatus} colors={COLORS} />
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          )}
+          <Grid item xs={12} md={6} lg={6}>
+            <OrdersStatusPie />
+          </Grid>
 
-          {/* Revenue by Category */}
-          {report.insights.revenueByCategory?.length > 0 && (
-            <Grid item xs={12} md={6} lg={4}>
-              <Card sx={{ height: 420 }}>
-                <CardContent
-                  sx={{
-                    height: '100%',
-                    display: "flex",
-                    flexDirection: "column",
-                    p: 3,
-                    "&:last-child": { pb: 3 },
-                  }}
-                >
-                  <Title highlight={false}>Revenue by Category (%)</Title>
-                  <Box sx={{ flexGrow: 1, minHeight: 250, mt: 2 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={report.insights.revenueByCategory}>
-                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                        <XAxis 
-                          dataKey="name" 
-                          tick={{fontSize: 12}}
-                          interval={0} 
-                          angle={-45}
-                          textAnchor="end"
-                        />
-                        <YAxis />
-                        <RechartsTooltip formatter={(value) => [`${value}%`, 'Revenue']} />
-                        <Bar 
-                          dataKey="value" 
-                          fill={theme.palette.primary.main}
-                          radius={[4, 4, 0, 0]} // rounded corners
-                        >
-                          {report.insights.revenueByCategory.map((entry, index) => (
-                            <Cell 
-                              key={`cat-${index}`} 
-                              fill={COLORS[index % COLORS.length]} 
-                            />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          )}
-          
-          {/* User Activity / Recent Orders */}
           <Grid item xs={12} md={6} lg={4}>
-            <Card sx={{ height: 420 }}>
-              <CardContent sx={{ p: 3, height: '100%' }}>
-                <Title highlight={false}>Recent Users</Title>
-                <Box sx={{ mt: 2, maxHeight: '330px', overflow: 'auto' }}>
-                  {report.insights.recentUsers ? (
+            <RevenueByCategory />
+          </Grid>
+
+          <Grid item xs={12} md={6} lg={4}>
+            <ProductsByCategory />
+          </Grid>
+
+          <Grid item xs={12} md={6} lg={4}>
+            <TopProductsTable />
+          </Grid>
+
+          <Grid item xs={12} md={6} lg={6}>
+            <RecentUsersList />
+          </Grid>
+
+          <Grid item xs={12} md={6} lg={6}>
+            <Card sx={{ boxShadow: '0 6px 18px rgba(15,23,42,0.06)', borderRadius: 2 }}>
+              <CardContent>
+                <Typography variant="h6">Recent Orders</Typography>
+                <Box sx={{ maxHeight: 260, overflow: 'auto', mt: 1 }}>
+                  {report?.insights?.recentOrders?.length ? (
                     <Table size="small">
                       <TableHead>
                         <TableRow>
-                          <TableCell>User</TableCell>
-                          <TableCell>Type</TableCell>
+                          <TableCell>Order ID</TableCell>
+                          <TableCell>Buyer</TableCell>
                           <TableCell>Status</TableCell>
+                          <TableCell>Amount</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {report.insights.recentUsers.map((user, idx) => (
-                          <TableRow key={idx} hover>
-                            <TableCell>
-                              <Stack direction="row" spacing={1} alignItems="center">
-                                <Avatar 
-                                  src={user.avatar}
-                                  alt={user.name} 
-                                  sx={{ width: 30, height: 30 }} 
-                                />
-                                <Typography variant="body2">{user.name}</Typography>
-                              </Stack>
-                            </TableCell>
-                            <TableCell>
-                              {user.type === 'seller' ? (
-                                <Chip 
-                                  size="small" 
-                                  label="Seller" 
-                                  color="secondary"
-                                  sx={{ fontWeight: 500, fontSize: '0.7rem' }}
-                                />
-                              ) : (
-                                <Chip 
-                                  size="small" 
-                                  label="Buyer" 
-                                  color="primary"
-                                  sx={{ fontWeight: 500, fontSize: '0.7rem' }}
-                                />
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <Chip 
-                                size="small" 
-                                label={user.status}
-                                variant="outlined"
-                                color={user.status === 'active' ? 'success' : 'default'}
-                                sx={{ fontWeight: 500, fontSize: '0.7rem' }}
-                              />
-                            </TableCell>
+                        {report.insights.recentOrders.map((o, i) => (
+                          <TableRow key={i} hover>
+                            <TableCell>{o.id || o.orderId}</TableCell>
+                            <TableCell>{o.buyerName || o.user}</TableCell>
+                            <TableCell><Chip size="small" label={o.status} color={o.status === 'shipped' ? 'success' : 'default'} /></TableCell>
+                            <TableCell>{o.total ? `$${formatNumber(o.total)}` : '-'}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
                   ) : (
-                    <Typography variant="body2" color="text.secondary">
-                      No recent users available.
-                    </Typography>
+                    <Typography variant="body2" color="text.secondary">No recent orders</Typography>
                   )}
                 </Box>
               </CardContent>
             </Card>
           </Grid>
-
-          {/* Các biểu đồ khác nếu có */}
-          {/* ... */}
         </Grid>
       )}
     </Box>
