@@ -37,14 +37,14 @@ import {
   YAxis,
   CartesianGrid,
   Legend,
-  LineChart, 
+  LineChart,
   Line,
   Radar,
-  RadarChart, 
-  PolarGrid, 
-  PolarAngleAxis, 
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
   PolarRadiusAxis,
-  RadialBarChart, 
+  RadialBarChart,
   RadialBar
 } from "recharts";
 import { Link } from "react-router-dom";
@@ -89,8 +89,8 @@ const TIME_OPTIONS = [
 // Component for stats card
 const StatCard = ({ title, value, icon, color = "primary.main", percentChange = null }) => {
   return (
-    <Card 
-      sx={{ 
+    <Card
+      sx={{
         height: '100%',
         position: 'relative',
         overflow: 'hidden',
@@ -101,14 +101,14 @@ const StatCard = ({ title, value, icon, color = "primary.main", percentChange = 
         }
       }}
     >
-      <Box 
-        sx={{ 
-          position: 'absolute', 
-          top: 0, 
-          right: 0, 
-          width: '30%', 
-          height: '100%', 
-          bgcolor: `${color}15`, 
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          width: '30%',
+          height: '100%',
+          bgcolor: `${color}15`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center'
@@ -130,8 +130,8 @@ const StatCard = ({ title, value, icon, color = "primary.main", percentChange = 
             ) : (
               <TrendingDownIcon fontSize="small" color="error" />
             )}
-            <Typography 
-              variant="body2" 
+            <Typography
+              variant="body2"
               color={percentChange >= 0 ? "success.main" : "error.main"}
               ml={0.5}
             >
@@ -161,19 +161,19 @@ const Overview = () => {
     setError(null);
     try {
       const res = await axios.get(
-        `http://localhost:9999/api/admin/report${
-          selectedPeriod ? `?period=${selectedPeriod}` : ""
-        }`,
+        `http://localhost:9999/api/admin/report${selectedPeriod ? `?period=${selectedPeriod}` : ""}`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("accessToken") || ""}`,
           },
         }
       );
+
       if (!res.data.success) {
         throw new Error("API response unsuccessful");
       }
-      // Calculate percentages for revenueByCategory
+
+      // ---- Revenue by Category ----
       const revenueByCategory = res.data.insights.revenueByCategory || [];
       const totalRevenue = revenueByCategory.reduce(
         (sum, item) => sum + (item.value || 0),
@@ -181,30 +181,36 @@ const Overview = () => {
       );
       const revenueByCategoryWithPercent = revenueByCategory.map((item) => ({
         ...item,
-        value:
-          totalRevenue > 0
-            ? Number(((item.value / totalRevenue) * 100).toFixed(1))
-            : 0,
+        value: totalRevenue > 0 ? Number(((item.value / totalRevenue) * 100).toFixed(1)) : 0,
       }));
-      // Prepare orderStatus for PieChart
+
+      // ---- Order Status ----
       const orderStatus = res.data.summary.orderStatus || {};
       const orderStatusData = Object.entries(orderStatus)
-        .map(([name, value]) => ({
-          name,
-          value,
-        }))
+        .map(([name, value]) => ({ name, value }))
         .filter((item) => item.value > 0);
+
+      // ---- Recent Users ----
+      const recentUsers = (res.data.activities?.recentActivity || [])
+        .filter(a => a.type === "New User")
+        .map(user => ({
+          name: user.details,
+          createdAt: user.createdAt
+        }));
+
       setReport({
         ...res.data,
         insights: {
           ...res.data.insights,
           revenueByCategory: revenueByCategoryWithPercent,
+          recentUsers // thêm mảng recentUsers
         },
         summary: {
           ...res.data.summary,
-          orderStatus: orderStatusData,
-        },
+          orderStatus: orderStatusData
+        }
       });
+
     } catch (error) {
       console.error("Error fetching report:", error.message);
       setError("Failed to load data. Please try again.");
@@ -269,71 +275,71 @@ const Overview = () => {
         <Grid container spacing={3}>
           {/* Summary Cards - first row */}
           <Grid item xs={12} sm={6} md={3}>
-            <StatCard 
-              title="Total Revenue (Shipped)" 
-              value={`$${formatNumber(report.summary.totalRevenue)}`} 
-              icon={<AttachMoneyIcon sx={{ fontSize: 40, color: 'primary.main' }} />} 
+            <StatCard
+              title="Total Revenue (Shipped)"
+              value={`$${formatNumber(report.summary.totalRevenue)}`}
+              icon={<AttachMoneyIcon sx={{ fontSize: 40, color: 'primary.main' }} />}
               percentChange={3.7} // Example value
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
-            <StatCard 
-              title="Total Orders" 
-              value={formatNumber(report.summary.totalOrders)} 
-              icon={<ShoppingCartIcon sx={{ fontSize: 40, color: 'secondary.main' }} />} 
+            <StatCard
+              title="Total Orders"
+              value={formatNumber(report.summary.totalOrders)}
+              icon={<ShoppingCartIcon sx={{ fontSize: 40, color: 'secondary.main' }} />}
               color="secondary.main"
               percentChange={2.1} // Example value
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
-            <StatCard 
-              title="Total Users" 
-              value={formatNumber(report.summary.totalUsers)} 
-              icon={<PeopleIcon sx={{ fontSize: 40, color: '#0288d1' }} />} 
+            <StatCard
+              title="Total Users"
+              value={formatNumber(report.summary.totalUsers)}
+              icon={<PeopleIcon sx={{ fontSize: 40, color: '#0288d1' }} />}
               color="#0288d1"
               percentChange={5.8} // Example value
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
-            <StatCard 
-              title="Unique Customers" 
-              value={formatNumber(report.summary.uniqueCustomers)} 
-              icon={<PersonIcon sx={{ fontSize: 40, color: '#43a047' }} />} 
+            <StatCard
+              title="Unique Customers"
+              value={formatNumber(report.summary.uniqueCustomers)}
+              icon={<PersonIcon sx={{ fontSize: 40, color: '#43a047' }} />}
               color="#43a047"
               percentChange={-1.2} // Example value
             />
           </Grid>
-          
+
           {/* Summary Cards - second row */}
           <Grid item xs={12} sm={6} md={3}>
-            <StatCard 
-              title="Products Shipped" 
-              value={formatNumber(report.summary.productsShipped)} 
-              icon={<LocalShippingIcon sx={{ fontSize: 40, color: '#7b1fa2' }} />} 
+            <StatCard
+              title="Products Shipped"
+              value={formatNumber(report.summary.productsShipped)}
+              icon={<LocalShippingIcon sx={{ fontSize: 40, color: '#7b1fa2' }} />}
               color="#7b1fa2"
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
-            <StatCard 
-              title="Active Buyers" 
-              value={formatNumber(report.summary.activeBuyers)} 
-              icon={<PersonOutlineIcon sx={{ fontSize: 40, color: '#c62828' }} />} 
+            <StatCard
+              title="Active Buyers"
+              value={formatNumber(report.summary.activeBuyers)}
+              icon={<PersonOutlineIcon sx={{ fontSize: 40, color: '#c62828' }} />}
               color="#c62828"
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
-            <StatCard 
-              title="Active Sellers" 
-              value={formatNumber(report.summary.activeSellers)} 
-              icon={<StoreIcon sx={{ fontSize: 40, color: '#f9a825' }} />} 
+            <StatCard
+              title="Active Sellers"
+              value={formatNumber(report.summary.activeSellers)}
+              icon={<StoreIcon sx={{ fontSize: 40, color: '#f9a825' }} />}
               color="#f9a825"
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
-            <StatCard 
-              title="Conversion Rate" 
-              value={`${report.summary.conversionRate || 0}%`} 
-              icon={<TimelineIcon sx={{ fontSize: 40, color: '#00897b' }} />} 
+            <StatCard
+              title="Conversion Rate"
+              value={`${report.summary.conversionRate || 0}%`}
+              icon={<TimelineIcon sx={{ fontSize: 40, color: '#00897b' }} />}
               color="#00897b"
             />
           </Grid>
@@ -341,7 +347,7 @@ const Overview = () => {
           {/* Order Status Breakdown */}
           {report.summary.orderStatus?.length > 0 && (
             <Grid item xs={12} md={6} lg={4}>
-              <Card sx={{ height: 420 }}>
+              <Card sx={{ height: 500 }}>
                 <CardContent
                   sx={{
                     height: '100%',
@@ -388,7 +394,7 @@ const Overview = () => {
           {/* Revenue by Category */}
           {report.insights.revenueByCategory?.length > 0 && (
             <Grid item xs={12} md={6} lg={4}>
-              <Card sx={{ height: 420 }}>
+              <Card sx={{ height: 500 }}>
                 <CardContent
                   sx={{
                     height: '100%',
@@ -403,24 +409,24 @@ const Overview = () => {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={report.insights.revenueByCategory}>
                         <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                        <XAxis 
-                          dataKey="name" 
-                          tick={{fontSize: 12}}
-                          interval={0} 
+                        <XAxis
+                          dataKey="name"
+                          tick={{ fontSize: 12 }}
+                          interval={0}
                           angle={-45}
                           textAnchor="end"
                         />
                         <YAxis />
                         <RechartsTooltip formatter={(value) => [`${value}%`, 'Revenue']} />
-                        <Bar 
-                          dataKey="value" 
+                        <Bar
+                          dataKey="value"
                           fill={theme.palette.primary.main}
                           radius={[4, 4, 0, 0]} // rounded corners
                         >
                           {report.insights.revenueByCategory.map((entry, index) => (
-                            <Cell 
-                              key={`cat-${index}`} 
-                              fill={COLORS[index % COLORS.length]} 
+                            <Cell
+                              key={`cat-${index}`}
+                              fill={COLORS[index % COLORS.length]}
                             />
                           ))}
                         </Bar>
@@ -431,10 +437,10 @@ const Overview = () => {
               </Card>
             </Grid>
           )}
-          
+
           {/* User Activity / Recent Orders */}
           <Grid item xs={12} md={6} lg={4}>
-            <Card sx={{ height: 420 }}>
+            <Card sx={{ height: 500 }}>
               <CardContent sx={{ p: 3, height: '100%' }}>
                 <Title highlight={false}>Recent Users</Title>
                 <Box sx={{ mt: 2, maxHeight: '330px', overflow: 'auto' }}>
@@ -442,52 +448,25 @@ const Overview = () => {
                     <Table size="small">
                       <TableHead>
                         <TableRow>
-                          <TableCell>User</TableCell>
-                          <TableCell>Type</TableCell>
-                          <TableCell>Status</TableCell>
+                          <TableCell>
+                            <Typography fontWeight="bold">User</Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography fontWeight="bold">Created At</Typography>
+                          </TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {report.insights.recentUsers.map((user, idx) => (
-                          <TableRow key={idx} hover>
-                            <TableCell>
-                              <Stack direction="row" spacing={1} alignItems="center">
-                                <Avatar 
-                                  src={user.avatar}
-                                  alt={user.name} 
-                                  sx={{ width: 30, height: 30 }} 
-                                />
-                                <Typography variant="body2">{user.name}</Typography>
-                              </Stack>
-                            </TableCell>
-                            <TableCell>
-                              {user.type === 'seller' ? (
-                                <Chip 
-                                  size="small" 
-                                  label="Seller" 
-                                  color="secondary"
-                                  sx={{ fontWeight: 500, fontSize: '0.7rem' }}
-                                />
-                              ) : (
-                                <Chip 
-                                  size="small" 
-                                  label="Buyer" 
-                                  color="primary"
-                                  sx={{ fontWeight: 500, fontSize: '0.7rem' }}
-                                />
-                              )}
-                            </TableCell>
-                            <TableCell>
-                              <Chip 
-                                size="small" 
-                                label={user.status}
-                                variant="outlined"
-                                color={user.status === 'active' ? 'success' : 'default'}
-                                sx={{ fontWeight: 500, fontSize: '0.7rem' }}
-                              />
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {(report.activities?.recentActivity || [])
+                          .filter(a => a.type === "New User")
+                          .map((user, idx) => (
+                            <TableRow key={idx} hover>
+                              <TableCell>{user.details}</TableCell>
+                              <TableCell>
+                                {new Date(user.createdAt).toLocaleString()}
+                              </TableCell>
+                            </TableRow>
+                          ))}
                       </TableBody>
                     </Table>
                   ) : (
