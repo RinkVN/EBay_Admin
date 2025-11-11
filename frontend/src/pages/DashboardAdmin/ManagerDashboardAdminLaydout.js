@@ -63,6 +63,7 @@ const AppBar = styled(MuiAppBar, {
     easing: theme.transitions.easing.sharp,
     duration: theme.transitions.duration.leavingScreen,
   }),
+    boxShadow: "0 4px 20px 0 rgba(0,0,0,0.1)",
   ...(open && {
     marginLeft: drawerWidth,
     width: `calc(100% - ${drawerWidth}px)`,
@@ -113,6 +114,13 @@ const customTheme = createTheme({
     background: {
       default: "#f5f7fa",
     },
+     secondary: {
+      main: "#ff6f00", // Amber
+      light: "#ffa040",
+      dark: "#c43e00",
+      contrastText: "#000000",
+    },
+
   },
   typography: {
     fontFamily: "'Roboto', 'Helvetica', 'Arial', sans-serif",
@@ -186,7 +194,6 @@ export default function AdminDashboardLayout() {
 
   const handleSetDashboardTitle = (newDashboardTitle) =>
     setDashboardTitle(newDashboardTitle);
-  };
 
   // Check if user can access a specific menu item based on role
   const canAccess = (requiredRoles) => {
@@ -372,6 +379,7 @@ export default function AdminDashboardLayout() {
                   />
                 </ListItemButton>
               )}
+            </React.Fragment>
 
             <Divider sx={{ my: 1, borderColor: "rgba(255,255,255,0.1)" }} />
             <React.Fragment>

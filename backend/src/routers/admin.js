@@ -79,7 +79,7 @@ const {
 const { ADMIN_ROLES } = require('../middleware/rbac');
 router.use(authMiddleware);
 router.use(authorizeRoles(...ADMIN_ROLES));
-
+router.use(adminAccessGuard);
 // --- User Management Routes ---
 router.get("/users", getAllUsers);
 router.get("/users/:userId", getUserDetails);

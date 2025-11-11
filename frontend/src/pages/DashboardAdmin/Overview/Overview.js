@@ -32,8 +32,6 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  LineChart,
-  Line,
 } from "recharts";
 import axios from "axios";
 import { useOutletContext } from "react-router-dom";
@@ -134,14 +132,59 @@ const Overview = () => {
         value: totalRevenueValue > 0 ? Number(((it.value / totalRevenueValue) * 100).toFixed(1)) : (it.value || 0),
       }));
 
-      // revenueOverTime fallback
-      const revenueOverTime = insights.revenueOverTime || insights.revenueByDate || [];
+      // revenueOverTime fallback and normalization
+      const rawRevenueOverTime = insights.revenueOverTime || insights.revenueByDate || insights.revenue || [];
+      // normalize to [{ date: 'YYYY-MM-DD' | label, revenue: number }]
+      const toDateKey = (d) => {
+        if (!d) return null;
+        const dt = new Date(d);
+        if (!isNaN(dt)) return dt.toISOString().split('T')[0];
+        // fallback: return first 10 chars of string
+        return String(d).slice(0, 10);
+      };
+      const revenueMap = (rawRevenueOverTime || []).reduce((acc, it) => {
+        const dateRaw = it.date || it.day || it.createdAt || it.label || it._id;
+        const dateKey = toDateKey(dateRaw);
+        if (!dateKey) return acc;
+        const val = Number(it.revenue ?? it.value ?? it.total ?? it.amount ?? it.y ?? 0) || 0;
+        acc[dateKey] = (acc[dateKey] || 0) + val;
+        return acc;
+      }, {});
+      const revenueOverTime = Object.entries(revenueMap).map(([date, revenue]) => ({ date, revenue })).sort((a, b) => a.date.localeCompare(b.date));
 
       // topProducts, productsByCategory and recentOrders/users
       const topProducts = insights.topProducts || [];
       const productsByCategory = insights.productsByCategory || [];
-      const recentOrders = insights.recentOrders || [];
-      const recentUsers = insights.recentUsers || [];
+      // If backend provides recentOrders in insights, use it.
+      // Otherwise try to derive recent orders from activities.recentActivity
+      const recentOrdersFromActivities = (data.activities?.recentActivity || [])
+        .filter(a => a.type === "New Order" || a.type === "Order Created" || a.entity === "order")
+        .map(act => ({
+          id: act.orderId || act.id,
+          orderId: act.orderId || act.id,
+          buyerName: act.userName || act.buyerName || act.details || (act.user && act.user.name),
+          user: act.userName || (act.user && act.user.name),
+          status: act.status || act.orderStatus || 'pending',
+          total: act.total || act.amount || 0,
+          createdAt: act.createdAt
+        }));
+
+      const recentOrders = (insights.recentOrders && insights.recentOrders.length) ? insights.recentOrders : recentOrdersFromActivities;
+      // If backend already provides recentUsers in insights, use it.
+      // Otherwise fall back to activities.recentActivity (filtering for New User events)
+      const recentUsersFromActivities = (data.activities?.recentActivity || [])
+        .filter(a => a.type === "New User")
+        .map(act => ({
+          // backend shape may differ; prefer details, then name
+          name: act.details || act.name || 'Unknown',
+          avatar: act.avatar || '',
+          // keep a simple type/status so RecentUsersList can render sensibly
+          type: act.userType || 'user',
+          status: act.status || 'active',
+          createdAt: act.createdAt
+        }));
+
+      const recentUsers = (insights.recentUsers && insights.recentUsers.length) ? insights.recentUsers : recentUsersFromActivities;
 
       // include productsByCategory so the ProductsByCategory component receives data
       setReport({
@@ -185,27 +228,6 @@ const Overview = () => {
       </Grid>
     </Grid>
   );
-
-  const RevenueOverTime = () => {
-    const data = report?.insights?.revenueOverTime || [];
-    const chartData = data.length ? data : [{ date: 'N/A', revenue: 0 }];
-    return (
-      <Card sx={{ height: '100%', boxShadow: '0 6px 18px rgba(15,23,42,0.06)', borderRadius: 2 }}>
-        <CardContent>
-          <Typography variant="h6">Revenue Over Time</Typography>
-          <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={chartData} margin={{ top: 16, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.12} />
-              <XAxis dataKey="date" tick={{ fill: '#475569' }} />
-              <YAxis tick={{ fill: '#475569' }} />
-              <RechartsTooltip formatter={(v) => [`$${formatNumber(v)}`]} />
-              <Line type="monotone" dataKey="revenue" stroke={CHART_COLOR} strokeWidth={2} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-    );
-  };
 
   const OrdersStatusPie = () => {
     const data = report?.orderStatus || [];
@@ -368,22 +390,18 @@ const Overview = () => {
           <Grid item xs={12}>{KPISection()}</Grid>
 
           <Grid item xs={12} md={6} lg={6}>
-            <RevenueOverTime />
-          </Grid>
-
-          <Grid item xs={12} md={6} lg={6}>
             <OrdersStatusPie />
           </Grid>
 
-          <Grid item xs={12} md={6} lg={4}>
+          <Grid item xs={12} md={6} lg={6}>
             <RevenueByCategory />
           </Grid>
 
-          <Grid item xs={12} md={6} lg={4}>
+          <Grid item xs={12} md={6} lg={6}>
             <ProductsByCategory />
           </Grid>
 
-          <Grid item xs={12} md={6} lg={4}>
+          <Grid item xs={12} md={6} lg={6}>
             <TopProductsTable />
           </Grid>
 
