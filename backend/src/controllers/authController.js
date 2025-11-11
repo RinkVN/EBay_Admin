@@ -141,6 +141,37 @@ exports.login = async (req, res) => {
       }
     }
 
+    // Check if account is locked
+    if (user.action === 'lock') {
+      return res.status(403).json({
+        success: false,
+        message: "Tài khoản của bạn đã bị khóa",
+        accountStatus: 'locked',
+        lockReason: user.lockReason || 'Tài khoản đã bị khóa bởi quản trị viên',
+        lockDuration: user.lockDuration || 'Không xác định',
+        lockUntil: user.lockUntil || null
+      });
+    }
+
+    // Check if account is rejected
+    if (user.accountStatus === 'rejected') {
+      return res.status(403).json({
+        success: false,
+        message: "Tài khoản của bạn đã bị từ chối",
+        accountStatus: 'rejected',
+        rejectionReason: user.rejectionReason || null
+      });
+    }
+
+    // Check if account is pending approval
+    if (user.accountStatus === 'pending') {
+      return res.status(403).json({
+        success: false,
+        message: "Tài khoản của bạn đang chờ được duyệt",
+        accountStatus: 'pending'
+      });
+    }
+
     // Otherwise issue full token (include twoFAVerified if internal)
     const token = jwt.sign(
       { id: user._id, role: user.role, twoFAVerified: internal },
@@ -151,10 +182,13 @@ exports.login = async (req, res) => {
     res.json({
       success: true,
       token,
+      accessToken: token,
       user: {
         id: user._id,
         username: user.username,
         role: user.role,
+        action: user.action,
+        accountStatus: user.accountStatus,
       },
     });
   } catch (error) {

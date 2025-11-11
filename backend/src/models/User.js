@@ -20,6 +20,17 @@ const userSchema = new Schema(
       enum: ["lock", "unlock"],
       default: "unlock",
     },
+    accountStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
+    },
+    approvedAt: { type: Date },
+    approvedBy: { type: Schema.Types.ObjectId, ref: "User" },
+    rejectionReason: { type: String },
+    lockReason: { type: String },
+    lockDuration: { type: String },
+    lockUntil: { type: Date },
     twoFAEnabled: { type: Boolean, default: false },
     twoFASecret: { type: String },
     trustedDevices: [

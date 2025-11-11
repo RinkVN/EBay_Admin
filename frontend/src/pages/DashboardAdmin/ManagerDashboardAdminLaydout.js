@@ -28,10 +28,8 @@ import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
 import StoreIcon from "@mui/icons-material/Store";
 import InventoryIcon from "@mui/icons-material/Inventory";
-import NotificationsIcon from "@mui/icons-material/Notifications";
-import SettingsIcon from "@mui/icons-material/Settings";
-import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import LocalOfferIcon from "@mui/icons-material/LocalOffer"; // Icon cho Voucher
+import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -63,7 +61,7 @@ const AppBar = styled(MuiAppBar, {
     easing: theme.transitions.easing.sharp,
     duration: theme.transitions.duration.leavingScreen,
   }),
-    boxShadow: "0 4px 20px 0 rgba(0,0,0,0.1)",
+  boxShadow: "0 4px 20px 0 rgba(0,0,0,0.1)",
   ...(open && {
     marginLeft: drawerWidth,
     width: `calc(100% - ${drawerWidth}px)`,
@@ -114,13 +112,12 @@ const customTheme = createTheme({
     background: {
       default: "#f5f7fa",
     },
-     secondary: {
+    secondary: {
       main: "#ff6f00", // Amber
       light: "#ffa040",
       dark: "#c43e00",
       contrastText: "#000000",
     },
-
   },
   typography: {
     fontFamily: "'Roboto', 'Helvetica', 'Arial', sans-serif",
@@ -216,6 +213,9 @@ export default function AdminDashboardLayout() {
   const handleOnclickVouchers = () => {
     navigate("/admin/manage-vouchers");
   };
+  const handleOnclickOrders = () => {
+    navigate("/admin/manage-orders");
+  };
 
   const handleOnclickSignout = async () => {
     await AuthenService.logout();
@@ -269,7 +269,7 @@ export default function AdminDashboardLayout() {
               px: [1],
               backgroundColor: "#424242",
             }}
-          >
+            >
             <Typography variant="h6" color="primary.contrastText" sx={{ ml: 1, display: open ? "block" : "none" }}>
               SHOP SDN
             </Typography>
@@ -375,6 +375,24 @@ export default function AdminDashboardLayout() {
                     primary="Manage Vouchers" 
                     primaryTypographyProps={{ 
                       fontWeight: currentPath === "/admin/manage-vouchers" ? 'bold' : 'normal' 
+                    }}
+                  />
+                </ListItemButton>
+              )}
+              
+              {/* Manage Orders - Admin only */}
+              {canAccess(['admin']) && (
+                <ListItemButton 
+                  onClick={handleOnclickOrders}
+                  selected={currentPath === "/admin/manage-orders"}
+                >
+                  <ListItemIcon sx={{ color: "primary.contrastText" }}>
+                    <ShoppingCartIcon />
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary="Order Management" 
+                    primaryTypographyProps={{ 
+                      fontWeight: currentPath === "/admin/manage-orders" ? 'bold' : 'normal' 
                     }}
                   />
                 </ListItemButton>

@@ -45,26 +45,84 @@ exports.getAllUsers = async (req, res) => {
     const skip = (page - 1) * limit;
     let query = {};
 
+    // Exclude admin users from the list
+    query.role = { $ne: 'admin' };
+
     // Filter by search
     if (req.query.search) {
-      query.$or = [
-        { username: { $regex: req.query.search, $options: "i" } },
-        { email: { $regex: req.query.search, $options: "i" } },
-      ];
+      const searchRegex = { $regex: req.query.search, $options: "i" };
+      
+      // Try to find users by username/email (excluding admin)
+      const foundUsers = await User.find({
+        $or: [
+          { username: searchRegex },
+          { email: searchRegex }
+        ],
+        role: { $ne: 'admin' } // Exclude admin in search
+      }).select('_id');
+      
+      // Build search query
+      const searchConditions = [];
+      
+      // Search by user ID (if it's a valid ObjectId)
+      if (mongoose.Types.ObjectId.isValid(req.query.search)) {
+        const searchId = new mongoose.Types.ObjectId(req.query.search);
+        // Verify it's not an admin
+        const userCheck = await User.findById(searchId).select('role');
+        if (userCheck && userCheck.role !== 'admin') {
+          searchConditions.push({ _id: searchId });
+        }
+      }
+      
+      // Search by found user IDs
+      if (foundUsers.length > 0) {
+        const userIds = foundUsers.map(u => u._id);
+        searchConditions.push({ _id: { $in: userIds } });
+      }
+      
+      if (searchConditions.length > 0) {
+        // Use $and to combine role exclusion with search
+        query.$and = [
+          { role: { $ne: 'admin' } },
+          { $or: searchConditions }
+        ];
+        delete query.role; // Remove direct role assignment since we use $and
+      } else {
+        // No search results found, but still exclude admin
+        query.role = { $ne: 'admin' };
+      }
     }
 
-    // Filter by role
-    if (req.query.role) {
-      query.role = req.query.role;
+    // Filter by role (but exclude admin)
+    if (req.query.role && req.query.role !== 'admin') {
+      if (query.$and) {
+        // If $and exists, update the role condition in $and
+        const roleCondition = query.$and.find(c => c.role);
+        if (roleCondition) {
+          roleCondition.role = req.query.role;
+        } else {
+          query.$and.push({ role: req.query.role });
+        }
+      } else {
+        query.role = req.query.role;
+      }
     }
 
-    // Filter by action
-    if (req.query.action) {
+    // Filter by action (lock/unlock)
+    if (req.query.action && req.query.action !== 'all') {
       query.action = req.query.action;
+    }
+
+    // Filter by new users (tài khoản mới trong 2 tuần / 14 ngày)
+    if (req.query.newUsers === 'true') {
+      const twoWeeksAgo = new Date();
+      twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+      query.createdAt = { $gte: twoWeeksAgo };
     }
 
     const users = await User.find(query)
       .select("-password")
+      .sort({ createdAt: -1 }) // Mới nhất trước
       .skip(skip)
       .limit(limit);
     const totalUsers = await User.countDocuments(query);
@@ -74,6 +132,7 @@ exports.getAllUsers = async (req, res) => {
       data: users,
       totalPages: Math.ceil(totalUsers / limit),
       currentPage: page,
+      total: totalUsers,
     });
   } catch (error) {
     handleError(res, error, "Lỗi khi lấy danh sách người dùng");
@@ -120,6 +179,83 @@ exports.deleteUserByAdmin = async (req, res) => {
     handleError(res, error, "Lỗi khi xóa người dùng");
   }
 };
+/**
+ * @desc Duyệt tài khoản mới (approve new account)
+ * @route PUT /api/admin/users/:userId/approve
+ * @access Riêng tư (Admin)
+ * @body { approved: boolean, rejectionReason?: string }
+ */
+exports.approveUser = async (req, res) => {
+  const { userId } = req.params;
+  const { approved, rejectionReason } = req.body; // approved: true or false, rejectionReason: optional
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Người dùng không tồn tại" });
+    }
+
+    // Set account status
+    if (approved) {
+      user.accountStatus = 'approved';
+      user.approvedAt = new Date();
+      user.approvedBy = req.user.id;
+      user.rejectionReason = null; // Clear rejection reason when approved
+    } else {
+      // Nếu từ chối, set status = 'rejected'
+      user.accountStatus = 'rejected';
+      user.approvedAt = null;
+      user.approvedBy = null;
+      user.rejectionReason = rejectionReason || null; // Save rejection reason if provided
+    }
+
+    await user.save();
+
+    // Send email notification
+    if (user.email) {
+      let emailSubject, emailText;
+      
+      if (approved) {
+        // Email thông báo duyệt tài khoản
+        emailSubject = "Tài khoản của bạn đã được duyệt";
+        emailText = `Kính gửi ${user.username},\n\nTài khoản của bạn đã được duyệt bởi quản trị viên. Bạn có thể bắt đầu sử dụng dịch vụ của chúng tôi.\n\nTrân trọng,\nShopii Team`;
+      } else {
+        // Email thông báo từ chối tài khoản
+        emailSubject = "Tài khoản của bạn chưa được duyệt";
+        emailText = `Kính gửi ${user.username},\n\nRất tiếc, tài khoản của bạn chưa được duyệt bởi quản trị viên.`;
+        
+        if (rejectionReason) {
+          emailText += `\n\nLý do: ${rejectionReason}`;
+        }
+        
+        emailText += `\n\nVui lòng liên hệ hỗ trợ để biết thêm chi tiết hoặc yêu cầu xem xét lại.\n\nTrân trọng,\nShopii Team`;
+      }
+      
+      try {
+        await sendEmail(user.email, emailSubject, emailText);
+      } catch (emailError) {
+        console.error('Error sending approval/rejection email:', emailError);
+        // Don't fail the request if email fails
+      }
+    }
+
+    const userToReturn = user.toObject();
+    delete userToReturn.password;
+
+    res.status(200).json({
+      success: true,
+      message: approved 
+        ? "Duyệt tài khoản thành công" 
+        : "Từ chối tài khoản thành công",
+      data: userToReturn,
+    });
+  } catch (error) {
+    handleError(res, error, "Lỗi khi duyệt tài khoản");
+  }
+};
+
 /**
  * @desc Cập nhật chi tiết người dùng (vai trò, trạng thái khóa/mở khóa) bởi Admin
  * @route PUT /api/admin/users/:userId
@@ -548,6 +684,270 @@ exports.getProductStatsAdmin = async (req, res) => {
     });
   } catch (error) {
     handleError(res, error, "Lỗi khi lấy thống kê sản phẩm");
+  }
+};
+
+// --- Quản Lý Đơn Hàng (Order Management) ---
+
+/**
+ * @desc Lấy tất cả đơn hàng với phân trang và lọc
+ * @route GET /api/admin/orders?page=<page>&limit=<limit>&status=<status>&search=<search>
+ * @access Riêng tư (Admin)
+ */
+exports.getAllOrdersAdmin = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    let query = {};
+
+    // Filter by status
+    if (req.query.status && ['pending', 'processing', 'shipping', 'shipped', 'failed to ship', 'rejected'].includes(req.query.status)) {
+      query.status = req.query.status;
+    }
+
+    // Filter by search (order ID, buyer username, buyer email)
+    if (req.query.search) {
+      const searchRegex = { $regex: req.query.search, $options: "i" };
+      
+      // Try to find buyers by username/email
+      const buyers = await User.find({
+        $or: [
+          { username: searchRegex },
+          { email: searchRegex }
+        ]
+      }).select('_id');
+      
+      // Build search query
+      const searchConditions = [];
+      
+      // Search by order ID (if it's a valid ObjectId)
+      if (mongoose.Types.ObjectId.isValid(req.query.search)) {
+        searchConditions.push({ _id: new mongoose.Types.ObjectId(req.query.search) });
+      }
+      
+      // Search by buyer IDs
+      if (buyers.length > 0) {
+        const buyerIds = buyers.map(b => b._id);
+        searchConditions.push({ buyerId: { $in: buyerIds } });
+      }
+      
+      if (searchConditions.length > 0) {
+        query.$or = searchConditions;
+      }
+    }
+
+    // Filter by date range
+    if (req.query.startDate || req.query.endDate) {
+      query.orderDate = {};
+      if (req.query.startDate) {
+        query.orderDate.$gte = new Date(req.query.startDate);
+      }
+      if (req.query.endDate) {
+        query.orderDate.$lte = new Date(req.query.endDate);
+      }
+    }
+
+    // Get orders with populated buyer and address
+    const orders = await Order.find(query)
+      .populate('buyerId', 'username email fullname')
+      .populate('addressId')
+      .sort({ orderDate: -1 }) // Mới nhất trước
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    // Get total count for pagination
+    const totalOrders = await Order.countDocuments(query);
+
+    // Get order items and payment info for each order
+    const ordersWithDetails = await Promise.all(
+      orders.map(async (order) => {
+        // Get order items with product details
+        const items = await OrderItem.find({ orderId: order._id })
+          .populate({
+            path: 'productId',
+            select: 'title image price sellerId',
+            populate: {
+              path: 'sellerId',
+              select: 'username email'
+            }
+          })
+          .lean();
+
+        // Get payment info
+        const payment = await Payment.findOne({ orderId: order._id })
+          .select('method status amount transactionId paidAt')
+          .lean();
+
+        // Get shipping info for items
+        const shippingInfos = await ShippingInfo.find({
+          orderItemId: { $in: items.map(item => item._id) }
+        }).lean();
+
+        // Attach shipping info to items
+        const itemsWithShipping = items.map(item => {
+          const shipping = shippingInfos.find(s => s.orderItemId.toString() === item._id.toString());
+          return {
+            ...item,
+            shippingInfo: shipping || null
+          };
+        });
+
+        return {
+          ...order,
+          items: itemsWithShipping,
+          payment: payment || null
+        };
+      })
+    );
+
+    res.status(200).json({
+      success: true,
+      data: ordersWithDetails,
+      totalPages: Math.ceil(totalOrders / limit),
+      currentPage: page,
+      total: totalOrders,
+    });
+  } catch (error) {
+    handleError(res, error, "Lỗi khi lấy danh sách đơn hàng");
+  }
+};
+
+/**
+ * @desc Lấy chi tiết một đơn hàng bằng ID
+ * @route GET /api/admin/orders/:orderId
+ * @access Riêng tư (Admin)
+ */
+exports.getOrderDetailsAdmin = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    // Find order with populated buyer and address
+    const order = await Order.findById(orderId)
+      .populate('buyerId', 'username email fullname phone avatarURL')
+      .populate('addressId')
+      .lean();
+
+    if (!order) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Đơn hàng không tồn tại" });
+    }
+
+    // Get order items with product details
+    const items = await OrderItem.find({ orderId })
+      .populate({
+        path: 'productId',
+        select: 'title image price description sellerId categoryId',
+        populate: [
+          {
+            path: 'sellerId',
+            select: 'username email'
+          },
+          {
+            path: 'categoryId',
+            select: 'name'
+          }
+        ]
+      })
+      .lean();
+
+    // Get payment info
+    const payment = await Payment.findOne({ orderId })
+      .select('method status amount transactionId paidAt createdAt')
+      .lean();
+
+    // Get shipping info for each item
+    const shippingInfos = await ShippingInfo.find({
+      orderItemId: { $in: items.map(item => item._id) }
+    }).lean();
+
+    // Attach shipping info to items
+    const itemsWithShipping = items.map(item => {
+      const shipping = shippingInfos.find(s => s.orderItemId.toString() === item._id.toString());
+      return {
+        ...item,
+        shippingInfo: shipping || null
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ...order,
+        items: itemsWithShipping,
+        payment: payment || null
+      },
+    });
+  } catch (error) {
+    handleError(res, error, "Lỗi khi lấy chi tiết đơn hàng");
+  }
+};
+
+/**
+ * @desc Cập nhật trạng thái đơn hàng bởi Admin
+ * @route PUT /api/admin/orders/:orderId/status
+ * @access Riêng tư (Admin)
+ */
+exports.updateOrderStatusAdmin = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { status } = req.body;
+
+    // Validate status
+    const validStatuses = ['pending', 'processing', 'shipping', 'shipped', 'failed to ship', 'rejected'];
+    if (!status || !validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Trạng thái không hợp lệ. Các trạng thái hợp lệ: ${validStatuses.join(', ')}`
+      });
+    }
+
+    // Find order
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Đơn hàng không tồn tại" });
+    }
+
+    // Update order status
+    order.status = status;
+    await order.save();
+
+    // Get buyer info for email notification
+    const buyer = await User.findById(order.buyerId).select('email username');
+    
+    // Send email notification if status changed
+    if (buyer && buyer.email) {
+      const statusMessages = {
+        'pending': 'đang chờ xử lý',
+        'processing': 'đang được xử lý',
+        'shipping': 'đang được vận chuyển',
+        'shipped': 'đã được giao',
+        'failed to ship': 'giao hàng thất bại',
+        'rejected': 'đã bị từ chối'
+      };
+
+      const emailSubject = `Cập nhật trạng thái đơn hàng #${orderId}`;
+      const emailText = `Kính gửi ${buyer.username},\n\nĐơn hàng #${orderId} của bạn đã được cập nhật trạng thái thành: ${statusMessages[status] || status}.\n\nTổng giá trị đơn hàng: ${order.totalPrice.toLocaleString('vi-VN')} VNĐ\n\nTrân trọng,\nShopii Team`;
+
+      try {
+        await sendEmail(buyer.email, emailSubject, emailText);
+      } catch (emailError) {
+        console.error('Error sending email notification:', emailError);
+        // Don't fail the request if email fails
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Cập nhật trạng thái đơn hàng thành công",
+      data: order,
+    });
+  } catch (error) {
+    handleError(res, error, "Lỗi khi cập nhật trạng thái đơn hàng");
   }
 };
 

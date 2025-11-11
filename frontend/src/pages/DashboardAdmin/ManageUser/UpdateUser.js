@@ -106,7 +106,7 @@ export default function UpdateUser({
               onChange={(e) => setRole(e.target.value)}
               sx={{ mb: 2 }}
             >
-              <MenuItem value="user">User</MenuItem>
+              <MenuItem value="buyer">Buyer</MenuItem>
               <MenuItem value="seller">Seller</MenuItem>
               <MenuItem value="admin">Admin</MenuItem>
             </TextField>

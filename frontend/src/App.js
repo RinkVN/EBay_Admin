@@ -58,10 +58,13 @@ import ManageUser from "./pages/DashboardAdmin/ManageUser/ManageUser";
 import ManageStore from "./pages/DashboardAdmin/ManageShop/ManageStore";
 import ManageProductA from "./pages/DashboardAdmin/ManageProduct/ManageProduct";
 import ManageVoucher from "./pages/DashboardAdmin/ManageVoucher/ManageVoucher";
+import ManageOrderAdmin from "./pages/DashboardAdmin/ManageOrder/ManageOrder";
 import AdminDashboardLayout from "./pages/DashboardAdmin/ManagerDashboardAdminLaydout";
 import ProtectedRoute from './components/ProtectedRoute';
 import { ROLES } from './utils/roles';
 import AdminSetup2FA from "./pages/AdminSetup2FA.jsx";
+import LockedAccount from "./pages/LockedAccount";
+import PendingAccount from "./pages/PendingAccount";
 
 const Layout = () => {
   return (
@@ -150,6 +153,13 @@ const router = createBrowserRouter(
             <ManageVoucher />
           </ProtectedRoute>
         }></Route>
+        
+        {/* Manage Orders - Admin only */}
+        <Route path="/admin/manage-orders" element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+            <ManageOrderAdmin />
+          </ProtectedRoute>
+        }></Route>
       </Route>
 
       {/* Seller/Dashboard routes - protected to prevent buyer access */}
@@ -169,6 +179,8 @@ const router = createBrowserRouter(
         <Route path="manage-return-request" element={<ManageReturnRequest />} />
       </Route>
 
+      <Route path="/locked-account" element={<LockedAccount />}></Route>
+      <Route path="/pending-account" element={<PendingAccount />}></Route>
       <Route path="/signin" element={<SignIn />}></Route>
       <Route path="/admin/setup-2fa" element={<AdminSetup2FA />}></Route>
       <Route path="/signup" element={<SignUp />}></Route>

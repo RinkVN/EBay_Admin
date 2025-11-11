@@ -68,6 +68,33 @@ const SignIn = () => {
         return;
       }
 
+      // Check if account is locked, rejected, or pending
+      if (response.accountStatus === 'locked') {
+        // Store lock info and redirect to locked account page
+        localStorage.setItem('lockReason', response.lockReason || '');
+        localStorage.setItem('lockDuration', response.lockDuration || '');
+        if (response.lockUntil) {
+          localStorage.setItem('lockUntil', response.lockUntil);
+        }
+        navigate('/locked-account');
+        return;
+      }
+
+      if (response.accountStatus === 'rejected') {
+        // Store rejection info and redirect to pending account page (which handles rejected)
+        if (response.rejectionReason) {
+          localStorage.setItem('rejectionReason', response.rejectionReason);
+        }
+        navigate('/pending-account');
+        return;
+      }
+
+      if (response.accountStatus === 'pending') {
+        // Redirect to pending account page
+        navigate('/pending-account');
+        return;
+      }
+
       dispatch(setCredentials({ user: response.user, token: response.accessToken || response.token }));
       toast.success('Login successful!');
       
@@ -80,7 +107,34 @@ const SignIn = () => {
       }
       
     } catch (error) {
-      toast.error(error.message || 'Login failed');
+      // Check if error response contains account status info
+      if (error.response?.data?.accountStatus === 'locked') {
+        // Store lock info and redirect to locked account page
+        localStorage.setItem('lockReason', error.response.data.lockReason || '');
+        localStorage.setItem('lockDuration', error.response.data.lockDuration || '');
+        if (error.response.data.lockUntil) {
+          localStorage.setItem('lockUntil', error.response.data.lockUntil);
+        }
+        navigate('/locked-account');
+        return;
+      }
+
+      if (error.response?.data?.accountStatus === 'rejected') {
+        // Store rejection info and redirect to pending account page (which handles rejected)
+        if (error.response.data.rejectionReason) {
+          localStorage.setItem('rejectionReason', error.response.data.rejectionReason);
+        }
+        navigate('/pending-account');
+        return;
+      }
+
+      if (error.response?.data?.accountStatus === 'pending') {
+        // Redirect to pending account page
+        navigate('/pending-account');
+        return;
+      }
+
+      toast.error(error.response?.data?.message || error.message || 'Login failed');
     } finally {
       setIsLoading(false);
     }

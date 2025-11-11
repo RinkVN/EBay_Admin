@@ -10,6 +10,10 @@ export const login = async (credentials) => {
     const response = await axios.post(`${API_URL}/login`, credentials, { headers });
     return response.data;
   } catch (error) {
+    // If account is locked or pending, return the error response data instead of throwing
+    if (error.response?.data?.accountStatus === 'locked' || error.response?.data?.accountStatus === 'pending' || error.response?.data?.accountStatus === 'rejected') {
+      return error.response.data;
+    }
     throw new Error(
       error.response?.data?.message ||
       'Đã xảy ra lỗi khi đăng nhập'

@@ -55,6 +55,9 @@ const {
   getOrderDetailsAdmin,
   updateOrderStatusAdmin,
 
+  // User Approval
+  approveUser,
+
   // Review and Feedback Moderation
   getAllReviewsAdmin,
   deleteReviewByAdmin,
@@ -84,9 +87,10 @@ router.use(adminAccessGuard);
 router.get("/users", getAllUsers);
 router.get("/users/:userId", getUserDetails);
 router.put("/users/:userId", updateUserByAdmin);
-router.delete("/users/:userId", deleteUserByAdmin);
+router.put("/users/:userId/approve", approveUser); // Approve/Reject user account
 router.put("/users/:userId/role", updateUserRole); // Update user role
 router.post("/create-admin-user", createAdminUser); // Create new admin user with specific role
+router.delete("/users/:userId", deleteUserByAdmin);
 // --- Store Management Routes ---
 router.get("/stores", getAllStoresAdmin);
 router.get("/stores/:storeId", getStoreDetails);
@@ -111,10 +115,10 @@ router.delete("/products/:id", deleteProductAdmin); // xoá sản phẩm
 router.get("/products/stats", getProductStatsAdmin); // thống kê sản phẩm
 router.get("/products/:id/reviews", getProductReviewsAndStats);
 
-// // --- Order Management by Admin Routes ---
-// router.get("/orders", getAllOrdersAdmin);
-// router.get("/orders/:orderId", getOrderDetailsAdmin);
-// router.put("/orders/:orderId/status", updateOrderStatusAdmin);
+// --- Order Management by Admin Routes ---
+router.get("/orders", getAllOrdersAdmin);
+router.get("/orders/:orderId", getOrderDetailsAdmin);
+router.put("/orders/:orderId/status", updateOrderStatusAdmin);
 
 // --- Review and Feedback Moderation Routes ---
 router.get("/reviews", getAllReviewsAdmin); // danh sách đánh giá

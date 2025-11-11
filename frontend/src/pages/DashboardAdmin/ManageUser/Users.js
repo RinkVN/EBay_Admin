@@ -6,9 +6,10 @@ import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Pagination from "@mui/material/Pagination";
 import Stack from "@mui/material/Stack";
- 
+import { useNavigate } from "react-router-dom";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
+import Tooltip from "@mui/material/Tooltip";
 import {
   Alert,
   Box,
@@ -36,7 +37,7 @@ import {
   Card,
   CardContent,
   Divider,
-  
+  useTheme,
   Menu,
   MenuItem,
   ListItemIcon,
@@ -44,8 +45,6 @@ import {
   Badge,
 } from "@mui/material";
 import axios from "axios";
-import { useSelector } from 'react-redux';
-import { hasPermission, PERMISSIONS } from '../../../utils/roles';
 import UpdateUser from "./UpdateUser";
 import FilterAltIcon from "@mui/icons-material/FilterAlt";
 import ClearAllIcon from "@mui/icons-material/ClearAll";
@@ -56,15 +55,18 @@ import StorefrontIcon from "@mui/icons-material/Storefront";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import LockPersonIcon from "@mui/icons-material/LockPerson";
 import LockOpenIcon from "@mui/icons-material/LockOpen";
+import BlockIcon from "@mui/icons-material/Block";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import PendingIcon from "@mui/icons-material/Pending";
 import Title from "../Title";
 
-  // Component to display user status
+// Component to display user status
 const UserStatusChip = ({ status }) => {
   let color = "default";
   let label = status || "Unknown";
-  
-  switch(status) {
+
+  switch (status) {
     case "active":
       color = "success";
       break;
@@ -80,14 +82,14 @@ const UserStatusChip = ({ status }) => {
     default:
       color = "default";
   }
-  
+
   return (
-    <Chip 
-      label={label} 
-      color={color} 
-      size="small" 
+    <Chip
+      label={label}
+      color={color}
+      size="small"
       variant="outlined"
-      sx={{ fontWeight: 500, textTransform: 'capitalize' }} 
+      sx={{ fontWeight: 500, textTransform: 'capitalize' }}
     />
   );
 };
@@ -104,8 +106,18 @@ const RoleIcon = ({ role }) => {
   }
 };
 
-export default function Users({ users: initialUsers, onUserUpdated }) {
-  
+export default function Users({
+  users: initialUsers,
+  onUserUpdated,
+  currentPage = 1,
+  totalPages = 1,
+  totalUsers = 0,
+  onPageChange,
+  filters = { search: '', role: '', action: 'all', newUsers: false },
+  onFiltersChange
+}) {
+  const navigate = useNavigate();
+  const theme = useTheme();
   const [deletingUser, setDeletingUser] = React.useState(null);
   const [editingUser, setEditingUser] = React.useState(null);
   const [snackbar, setSnackbar] = React.useState({
@@ -113,14 +125,22 @@ export default function Users({ users: initialUsers, onUserUpdated }) {
     msg: "",
     severity: "success",
   });
-  const [keywords, setKeywords] = React.useState("");
-  const [selectedRoles, setSelectedRoles] = React.useState([]);
-  const [actionFilter, setActionFilter] = React.useState("all");
-  const [currentPage, setCurrentPage] = React.useState(1);
-  
+  const [keywords, setKeywords] = React.useState(filters.search || "");
+  const [selectedRole, setSelectedRole] = React.useState(filters.role || 'all');
+  const [actionFilter, setActionFilter] = React.useState(filters.action || 'all');
+  const [newUsersFilter, setNewUsersFilter] = React.useState(filters.newUsers || false);
+  const [loading, setLoading] = React.useState(false);
+
   // For actions menu
   const [actionMenuAnchor, setActionMenuAnchor] = React.useState(null);
   const [selectedUser, setSelectedUser] = React.useState(null);
+
+  // For rejection dialog
+  const [rejectionDialog, setRejectionDialog] = React.useState({
+    open: false,
+    user: null,
+    reason: '',
+  });
 
   const handleDeleteUser = async () => {
     if (!deletingUser) return;
@@ -130,9 +150,8 @@ export default function Users({ users: initialUsers, onUserUpdated }) {
         `http://localhost:9999/api/admin/users/${deletingUser._id}`,
         {
           headers: {
-            Authorization: `Bearer ${
-              localStorage.getItem("accessToken") || ""
-            }`,
+            Authorization: `Bearer ${localStorage.getItem("accessToken") || ""
+              }`,
           },
           params: { skipAuth: true }, // Chỉ dùng nếu backend xử lý skipAuth
         }
@@ -153,97 +172,213 @@ export default function Users({ users: initialUsers, onUserUpdated }) {
       console.error("Delete error:", error.response || error);
       setSnackbar({
         open: true,
-        msg: `Error deleting user! ${
-          error.response?.data?.message || error.message
-        }`,
+        msg: `Error deleting user! ${error.response?.data?.message || error.message
+          }`,
         severity: "error",
       });
       setDeletingUser(null);
     }
   };
 
-  // Compute unique roles from users
+  // Compute unique roles from users (exclude admin)
   const roles = React.useMemo(() => {
-    const roleSet = new Set();
+    const roleSet = new Set(['buyer', 'seller']);
     initialUsers.forEach((user) => {
-      if (user.role) roleSet.add(user.role);
+      if (user.role && user.role !== 'admin') roleSet.add(user.role);
     });
     return Array.from(roleSet);
   }, [initialUsers]);
 
-  // Filter users based on search, roles, and action
-  const filteredUsers = React.useMemo(() => {
-    let filtered = [...initialUsers];
+  // Check if user is new (created within 2 weeks / 14 days)
+  const isNewUser = (user) => {
+    if (!user.createdAt) return false;
+    const createdAt = new Date(user.createdAt);
+    const twoWeeksAgo = new Date();
+    twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+    return createdAt >= twoWeeksAgo;
+  };
 
-    // 1. Filter by search (username or email)
-    if (keywords.trim() !== "") {
-      const keywordLower = keywords.trim().toLowerCase();
-      filtered = filtered.filter(
-        (user) =>
-          (user.username &&
-            user.username.toLowerCase().includes(keywordLower)) ||
-          (user.email && user.email.toLowerCase().includes(keywordLower))
-      );
-    }
-
-    // 2. Filter by selected roles
-    if (selectedRoles.length > 0) {
-      filtered = filtered.filter((user) => selectedRoles.includes(user.role));
-    }
-
-    // 3. Filter by action status
-    if (actionFilter === "lock") {
-      filtered = filtered.filter((user) => user.action === "lock");
-    } else if (actionFilter === "unlock") {
-      filtered = filtered.filter((user) => user.action === "unlock");
-    }
-
-    return filtered;
-  }, [initialUsers, keywords, selectedRoles, actionFilter]);
-
-  const USERS_PER_PAGE = 10;
-  const totalFilteredPages = Math.ceil(filteredUsers.length / USERS_PER_PAGE);
-  const startIdx = (currentPage - 1) * USERS_PER_PAGE;
-  const endIdx = startIdx + USERS_PER_PAGE;
-  const pageData = filteredUsers.slice(startIdx, endIdx);
-
+  // Handle search with debounce
   React.useEffect(() => {
-    setCurrentPage(1); // Reset to first page when filters change
-  }, [selectedRoles, actionFilter, keywords]);
+    const timer = setTimeout(() => {
+      if (onFiltersChange) {
+        onFiltersChange({
+          search: keywords,
+          role: selectedRole,
+          action: actionFilter,
+          newUsers: newUsersFilter
+        });
+      }
+    }, 500); // Debounce 500ms
 
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keywords]);
+
+  // Handle filter changes
   const handleRoleChange = (role) => {
-    setSelectedRoles((prev) =>
-      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]
-    );
+    setSelectedRole(role);
+    if (onFiltersChange) {
+      onFiltersChange({
+        ...filters,
+        role: role,
+        action: actionFilter,
+        newUsers: newUsersFilter
+      });
+    }
   };
 
-  const handlePageChange = (event, newPage) => {
-    setCurrentPage(newPage);
+  const handleActionFilterChange = (action) => {
+    setActionFilter(action);
+    if (onFiltersChange) {
+      onFiltersChange({
+        ...filters,
+        role: selectedRole,
+        action: action,
+        newUsers: newUsersFilter
+      });
+    }
   };
-  
+
+  const handleNewUsersFilterChange = (checked) => {
+    setNewUsersFilter(checked);
+    if (onFiltersChange) {
+      onFiltersChange({
+        ...filters,
+        role: selectedRole,
+        action: actionFilter,
+        newUsers: checked
+      });
+    }
+  };
+
+  const handleClearFilters = () => {
+    setKeywords("");
+    setSelectedRole('all');
+    setActionFilter('all');
+    setNewUsersFilter(false);
+    if (onFiltersChange) {
+      onFiltersChange({
+        search: '',
+        role: '',
+        action: 'all',
+        newUsers: false
+      });
+    }
+  };
+
   // Action menu handlers
   const handleOpenActionMenu = (event, user) => {
     setActionMenuAnchor(event.currentTarget);
     setSelectedUser(user);
   };
-  
+
   const handleCloseActionMenu = () => {
     setActionMenuAnchor(null);
   };
-  
+
   const handleUserAction = (action) => {
     if (action === 'edit' && selectedUser) {
       setEditingUser(selectedUser);
     } else if (action === 'delete' && selectedUser) {
       setDeletingUser(selectedUser);
+    } else if (action === 'lock' && selectedUser) {
+      handleLockUnlock(selectedUser, 'lock');
+    } else if (action === 'unlock' && selectedUser) {
+      handleLockUnlock(selectedUser, 'unlock');
     }
     handleCloseActionMenu();
   };
 
-  // Permissions from current logged-in user
-  const auth = useSelector((state) => state.auth);
-  const currentRole = auth?.user?.role;
-  const canManageUsers = hasPermission(currentRole, PERMISSIONS.MANAGE_USERS) || currentRole === 'admin';
+  // Quick lock/unlock function
+  const handleLockUnlock = async (user, action) => {
+    try {
+      setLoading(true);
+      const response = await axios.put(
+        `http://localhost:9999/api/admin/users/${user._id}`,
+        { action: action },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+          },
+        }
+      );
+
+      if (response.status === 200) {
+        setSnackbar({
+          open: true,
+          msg: `User ${action === 'lock' ? 'locked' : 'unlocked'} successfully!`,
+          severity: "success",
+        });
+        onUserUpdated(currentPage); // Reload user list
+      }
+    } catch (error) {
+      console.error("Lock/Unlock error:", error);
+      setSnackbar({
+        open: true,
+        msg: `Error ${action === 'lock' ? 'locking' : 'unlocking'} user! ${error.response?.data?.message || error.message
+          }`,
+        severity: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Approve user account function
+  const handleApproveUser = async (user, approved, rejectionReason = '') => {
+    try {
+      setLoading(true);
+      const response = await axios.put(
+        `http://localhost:9999/api/admin/users/${user._id}/approve`,
+        { approved: approved, rejectionReason: rejectionReason || undefined },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
+          },
+        }
+      );
+
+      if (response.status === 200) {
+        setSnackbar({
+          open: true,
+          msg: approved ? 'Tài khoản đã được duyệt thành công!' : 'Tài khoản đã bị từ chối thành công!',
+          severity: "success",
+        });
+        onUserUpdated(currentPage); // Reload user list
+        setRejectionDialog({ open: false, user: null, reason: '' }); // Close dialog
+      }
+    } catch (error) {
+      console.error("Approve error:", error);
+      setSnackbar({
+        open: true,
+        msg: `Lỗi khi ${approved ? 'duyệt' : 'từ chối'} tài khoản! ${error.response?.data?.message || error.message
+          }`,
+        severity: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle reject button click - show dialog
+  const handleRejectClick = (user) => {
+    setRejectionDialog({ open: true, user, reason: '' });
+    setActionMenuAnchor(null); // Close menu
+  };
+
+  // Handle approve button click - directly approve
+  const handleApproveClick = (user) => {
+    handleApproveUser(user, true);
+    setActionMenuAnchor(null); // Close menu
+  };
+
+  // Handle confirm rejection
+  const handleConfirmRejection = () => {
+    if (rejectionDialog.user) {
+      handleApproveUser(rejectionDialog.user, false, rejectionDialog.reason);
+    }
+  };
 
   return (
     <React.Fragment>
@@ -276,13 +411,64 @@ export default function Users({ users: initialUsers, onUserUpdated }) {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Rejection Reason Dialog */}
+      <Dialog
+        open={rejectionDialog.open}
+        onClose={() => setRejectionDialog({ open: false, user: null, reason: '' })}
+        PaperProps={{
+          sx: { borderRadius: 2, minWidth: 400 }
+        }}
+      >
+        <DialogTitle>
+          <Box display="flex" alignItems="center">
+            <BlockIcon color="error" sx={{ mr: 1 }} />
+            Từ Chối Tài Khoản
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ mb: 2 }}>
+            Bạn có chắc chắn muốn từ chối tài khoản của <b>{rejectionDialog.user?.username || rejectionDialog.user?.email}</b>?
+          </DialogContentText>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Lý do từ chối (tùy chọn)"
+            fullWidth
+            multiline
+            rows={4}
+            variant="outlined"
+            value={rejectionDialog.reason}
+            onChange={(e) => setRejectionDialog({ ...rejectionDialog, reason: e.target.value })}
+            placeholder="Nhập lý do từ chối tài khoản này..."
+            sx={{ mt: 2 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setRejectionDialog({ open: false, user: null, reason: '' })}
+            color="inherit"
+          >
+            Hủy
+          </Button>
+          <Button
+            onClick={handleConfirmRejection}
+            color="error"
+            variant="contained"
+            disabled={loading}
+          >
+            {loading ? 'Đang xử lý...' : 'Xác Nhận Từ Chối'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Snackbar
         open={snackbar.open}
         autoHideDuration={2500}
         onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
       >
-        <Alert 
+        <Alert
           severity={snackbar.severity}
           variant="filled"
           sx={{ width: '100%' }}
@@ -290,7 +476,7 @@ export default function Users({ users: initialUsers, onUserUpdated }) {
           {snackbar.msg}
         </Alert>
       </Snackbar>
-      
+
       {editingUser && (
         <UpdateUser
           user={editingUser}
@@ -299,11 +485,11 @@ export default function Users({ users: initialUsers, onUserUpdated }) {
           onUpdated={(success) => {
             setEditingUser(null);
             if (success) {
-                    setSnackbar({
-        open: true,
-        msg: "User updated successfully!",
-        severity: "success",
-      });
+              setSnackbar({
+                open: true,
+                msg: "User updated successfully!",
+                severity: "success",
+              });
               onUserUpdated(currentPage);
             }
           }}
@@ -312,7 +498,7 @@ export default function Users({ users: initialUsers, onUserUpdated }) {
 
       <Box mb={4}>
         <Title highlight={true}>User Management</Title>
-        
+
         <Box mb={3}>
           <Typography variant="body2" color="text.secondary">
             Manage all users in the system, including admins, sellers, and buyers.
@@ -330,18 +516,18 @@ export default function Users({ users: initialUsers, onUserUpdated }) {
             }}
           >
             <CardContent>
-              <Typography 
-                variant="subtitle1" 
-                fontWeight="bold" 
+              <Typography
+                variant="subtitle1"
+                fontWeight="bold"
                 color="primary"
                 sx={{ mb: 2, display: 'flex', alignItems: 'center' }}
               >
                 <FilterAltIcon sx={{ mr: 1 }} fontSize="small" />
                 Filters
               </Typography>
-              
+
               <Divider sx={{ mb: 2 }} />
-              
+
               <Box sx={{ mb: 3 }}>
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>
                   Search
@@ -362,23 +548,25 @@ export default function Users({ users: initialUsers, onUserUpdated }) {
                   sx={{ mb: 2 }}
                 />
               </Box>
-              
+
               <Box sx={{ mb: 3 }}>
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>
                   Role
                 </Typography>
-                <FormGroup>
+                <RadioGroup
+                  value={selectedRole}
+                  onChange={(e) => handleRoleChange(e.target.value)}
+                >
+                  <FormControlLabel
+                    value="all"
+                    control={<Radio size="small" color="primary" />}
+                    label="All Roles"
+                  />
                   {roles.map((role) => (
                     <FormControlLabel
                       key={role}
-                      control={
-                        <Checkbox
-                          checked={selectedRoles.includes(role)}
-                          onChange={() => handleRoleChange(role)}
-                          size="small"
-                          color="primary"
-                        />
-                      }
+                      value={role}
+                      control={<Radio size="small" color="primary" />}
                       label={
                         <Box display="flex" alignItems="center">
                           <RoleIcon role={role} />
@@ -389,16 +577,16 @@ export default function Users({ users: initialUsers, onUserUpdated }) {
                       }
                     />
                   ))}
-                </FormGroup>
+                </RadioGroup>
               </Box>
-              
-              <Box sx={{ mb: 2 }}>
+
+              <Box sx={{ mb: 3 }}>
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>
                   Status
                 </Typography>
                 <RadioGroup
                   value={actionFilter}
-                  onChange={(e) => setActionFilter(e.target.value)}
+                  onChange={(e) => handleActionFilterChange(e.target.value)}
                 >
                   <FormControlLabel
                     value="all"
@@ -427,23 +615,40 @@ export default function Users({ users: initialUsers, onUserUpdated }) {
                   />
                 </RadioGroup>
               </Box>
-              
+
+              <Box sx={{ mb: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={newUsersFilter}
+                      onChange={(e) => handleNewUsersFilterChange(e.target.checked)}
+                      size="small"
+                      color="primary"
+                    />
+                  }
+                  label={
+                    <Box display="flex" alignItems="center">
+                      <Badge badgeContent="NEW" color="error" sx={{ mr: 1 }}>
+                        <PersonIcon fontSize="small" />
+                      </Badge>
+                      <Typography variant="body2">New Users (2 weeks)</Typography>
+                    </Box>
+                  }
+                />
+              </Box>
+
               <Button
                 startIcon={<ClearAllIcon />}
                 variant="outlined"
                 size="small"
                 fullWidth
-                onClick={() => {
-                  setKeywords("");
-                  setSelectedRoles([]);
-                  setActionFilter("all");
-                }}
+                onClick={handleClearFilters}
               >
                 Clear Filters
               </Button>
             </CardContent>
           </Card>
-          
+
           <Card elevation={0} sx={{ borderRadius: 2 }}>
             <CardContent>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
@@ -451,16 +656,17 @@ export default function Users({ users: initialUsers, onUserUpdated }) {
                   Statistics
                 </Typography>
               </Box>
-              
+
               <Divider sx={{ mb: 2 }} />
-              
+
               <Stack spacing={1}>
                 <Box display="flex" justifyContent="space-between">
                   <Typography variant="body2" color="text.secondary">Total Users:</Typography>
-                  <Typography variant="body2" fontWeight="bold">{initialUsers.length}</Typography>
+                  <Typography variant="body2" fontWeight="bold">{totalUsers}</Typography>
                 </Box>
-                
+
                 {roles.map(role => {
+                  // Note: This count is approximate based on current page data
                   const count = initialUsers.filter(u => u.role === role).length;
                   return (
                     <Box key={role} display="flex" justifyContent="space-between">
@@ -471,25 +677,32 @@ export default function Users({ users: initialUsers, onUserUpdated }) {
                     </Box>
                   );
                 })}
-                
+
                 <Box display="flex" justifyContent="space-between">
                   <Typography variant="body2" color="text.secondary">Locked:</Typography>
                   <Typography variant="body2" fontWeight="bold" color="error.main">
                     {initialUsers.filter(u => u.action === "lock").length}
                   </Typography>
                 </Box>
+
+                <Box display="flex" justifyContent="space-between">
+                  <Typography variant="body2" color="text.secondary">New (2 weeks):</Typography>
+                  <Typography variant="body2" fontWeight="bold" color="info.main">
+                    {initialUsers.filter(u => isNewUser(u)).length}
+                  </Typography>
+                </Box>
               </Stack>
             </CardContent>
           </Card>
         </Grid>
-        
+
         <Grid item xs={12} md={9}>
           <Card elevation={0} sx={{ borderRadius: 2 }}>
             <CardContent>
               <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Typography variant="subtitle1" fontWeight="bold">
-                  <Badge 
-                    badgeContent={filteredUsers.length} 
+                  <Badge
+                    badgeContent={totalUsers}
                     color="primary"
                     sx={{ '& .MuiBadge-badge': { fontSize: '0.7rem', height: '18px', minWidth: '18px' } }}
                   >
@@ -504,30 +717,41 @@ export default function Users({ users: initialUsers, onUserUpdated }) {
                 <Table sx={{ minWidth: 650 }} size="small" aria-label="user table">
                   <TableHead sx={{ bgcolor: 'primary.main' }}>
                     <TableRow>
-                      <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>ID</TableCell>
                       <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>User Information</TableCell>
                       <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Role</TableCell>
                       <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Status</TableCell>
+                      <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Created</TableCell>
                       <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="center">Actions</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {pageData.length > 0 ? (
-                      pageData.map((user) => (
+                    {initialUsers.length > 0 ? (
+                      initialUsers.map((user) => (
                         <TableRow
                           key={user._id}
                           sx={{ '&:last-child td, &:last-child th': { border: 0 }, '&:hover': { backgroundColor: 'rgba(0, 0, 0, 0.04)' } }}
                         >
-                          <TableCell component="th" scope="row" sx={{ maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {user._id}
-                          </TableCell>
                           <TableCell>
                             <Box sx={{ display: "flex", alignItems: "center" }}>
-                              <Avatar 
-                                src={user.avatarURL} 
-                                alt={user.username || user.email}
-                                sx={{ width: 36, height: 36, mr: 1.5 }}
-                              />
+                              <Badge
+                                badgeContent={isNewUser(user) ? "NEW" : ""}
+                                color="error"
+                                invisible={!isNewUser(user)}
+                                sx={{
+                                  '& .MuiBadge-badge': {
+                                    fontSize: '0.6rem',
+                                    height: '16px',
+                                    minWidth: '32px',
+                                    borderRadius: '8px'
+                                  }
+                                }}
+                              >
+                                <Avatar
+                                  src={user.avatarURL}
+                                  alt={user.username || user.email}
+                                  sx={{ width: 36, height: 36, mr: 1.5 }}
+                                />
+                              </Badge>
                               <Box>
                                 <Typography variant="body2" fontWeight="bold" component="div">
                                   {user.username || "N/A"}
@@ -547,16 +771,46 @@ export default function Users({ users: initialUsers, onUserUpdated }) {
                             </Box>
                           </TableCell>
                           <TableCell>
-                            <UserStatusChip status={user.action || "unknown"} />
+                            <UserStatusChip status={user.action || "unlock"} />
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" fontSize="small" color="text.secondary">
+                              {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
+                            </Typography>
                           </TableCell>
                           <TableCell align="center">
-                            <IconButton
-                              size="small"
-                              aria-label="actions"
-                              onClick={(e) => handleOpenActionMenu(e, user)}
-                            >
-                              <MoreVertIcon fontSize="small" />
-                            </IconButton>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                              {user.action === 'unlock' ? (
+                                <Tooltip title="Lock Account">
+                                  <IconButton
+                                    size="small"
+                                    color="warning"
+                                    onClick={() => handleLockUnlock(user, 'lock')}
+                                    disabled={loading}
+                                  >
+                                    <LockPersonIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              ) : (
+                                <Tooltip title="Unlock Account">
+                                  <IconButton
+                                    size="small"
+                                    color="success"
+                                    onClick={() => handleLockUnlock(user, 'unlock')}
+                                    disabled={loading}
+                                  >
+                                    <LockOpenIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                              <IconButton
+                                size="small"
+                                aria-label="more actions"
+                                onClick={(e) => handleOpenActionMenu(e, user)}
+                              >
+                                <MoreVertIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
                           </TableCell>
                         </TableRow>
                       ))
@@ -572,12 +826,12 @@ export default function Users({ users: initialUsers, onUserUpdated }) {
                   </TableBody>
                 </Table>
               </TableContainer>
-              
+
               <Box display="flex" justifyContent="center">
                 <Pagination
-                  count={totalFilteredPages}
+                  count={totalPages}
                   page={currentPage}
-                  onChange={handlePageChange}
+                  onChange={(e, page) => onPageChange && onPageChange(page)}
                   color="primary"
                   showFirstButton
                   showLastButton
@@ -587,7 +841,7 @@ export default function Users({ users: initialUsers, onUserUpdated }) {
           </Card>
         </Grid>
       </Grid>
-      
+
       {/* Actions menu */}
       <Menu
         anchorEl={actionMenuAnchor}
@@ -609,16 +863,30 @@ export default function Users({ users: initialUsers, onUserUpdated }) {
           </ListItemIcon>
           <ListItemText>View Details</ListItemText>
         </MenuItem>
+        {(selectedUser?.accountStatus === 'pending' || !selectedUser?.accountStatus) && (
+          <MenuItem onClick={() => handleApproveClick(selectedUser)}>
+            <ListItemIcon>
+              <CheckCircleIcon fontSize="small" color="success" />
+            </ListItemIcon>
+            <ListItemText>Duyệt Tài Khoản</ListItemText>
+          </MenuItem>
+        )}
+        {(selectedUser?.accountStatus === 'approved' || selectedUser?.accountStatus === 'pending' || !selectedUser?.accountStatus) && (
+          <MenuItem onClick={() => handleRejectClick(selectedUser)}>
+            <ListItemIcon>
+              <BlockIcon fontSize="small" color="error" />
+            </ListItemIcon>
+            <ListItemText>Từ Chối Tài Khoản</ListItemText>
+          </MenuItem>
+        )}
         <Divider />
-        {canManageUsers && (
-          <MenuItem onClick={() => handleUserAction('delete')}>
+        <MenuItem onClick={() => handleUserAction('delete')}>
           <ListItemIcon>
             <DeleteIcon fontSize="small" color="error" />
           </ListItemIcon>
           <ListItemText>Delete User</ListItemText>
-          </MenuItem>
-        )}
-        {selectedUser?.action === 'unlock' && canManageUsers && (
+        </MenuItem>
+        {selectedUser?.action === 'unlock' && (
           <MenuItem onClick={() => handleUserAction('lock')}>
             <ListItemIcon>
               <LockPersonIcon fontSize="small" color="warning" />
@@ -626,7 +894,7 @@ export default function Users({ users: initialUsers, onUserUpdated }) {
             <ListItemText>Lock Account</ListItemText>
           </MenuItem>
         )}
-        {selectedUser?.action === 'lock' && canManageUsers && (
+        {selectedUser?.action === 'lock' && (
           <MenuItem onClick={() => handleUserAction('unlock')}>
             <ListItemIcon>
               <LockOpenIcon fontSize="small" color="success" />
