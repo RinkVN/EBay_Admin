@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { setCredentials } from '../features/auth/authSlice';
-import { login } from '../services/authService';
+import { login, verifyAdmin2FA } from '../services/authService';
 import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
 
@@ -24,7 +24,7 @@ const EyeOffIcon = (props) => (
 const SignIn = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
-  
+
   // Form state
   const [formData, setFormData] = useState({
     email: '',
@@ -32,38 +32,46 @@ const SignIn = () => {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  
+  const [twoFARequired, setTwoFARequired] = useState(false);
+  const [tempToken, setTempToken] = useState('');
+  const [twoFACode, setTwoFACode] = useState('');
+  const [trustDevice, setTrustDevice] = useState(true);
+
   // Handle input changes
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
-  
+
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
       const response = await login({
         email: formData.email,
         password: formData.password
       });
-      
-      // Ensure we use accessToken consistently
-      dispatch(setCredentials({
-        user: response.user,
-        token: response.accessToken || response.token
-      }));
-      
-      toast.success('Login successful!');
-      
-      // Redirect based on user role
-      if (response.user.role === 'admin') {
-        navigate('/admin'); // Admin users to admin overview
-      } else {
-        navigate('/'); // Regular users to home page
+
+      if (response.requires2FASetup) {
+        // Navigate to setup 2FA using temp token
+        sessionStorage.setItem('temp2fa', response.token);
+        toast.info('Bạn cần bật 2FA trước khi tiếp tục');
+        navigate('/admin/setup-2fa');
+        return;
       }
-      
+
+      if (response.requires2FA) {
+        setTwoFARequired(true);
+        setTempToken(response.token);
+        toast.info('Vui lòng nhập mã 2FA để tiếp tục');
+        return;
+      }
+
+      dispatch(setCredentials({ user: response.user, token: response.accessToken || response.token }));
+      toast.success('Login successful!');
+      if (response.user.role === 'admin') navigate('/admin'); else navigate('/');
+
     } catch (error) {
       toast.error(error.message || 'Login failed');
     } finally {
@@ -71,9 +79,26 @@ const SignIn = () => {
     }
   };
 
+  const handleVerify2FA = async (e) => {
+    e.preventDefault();
+    if (!twoFACode) return;
+    setIsLoading(true);
+    try {
+      const result = await verifyAdmin2FA(tempToken, twoFACode, trustDevice);
+      // After verification, we need the user info; a simple way is to navigate and let app fetch profile
+      dispatch(setCredentials({ user: { role: 'admin' }, token: result.token }));
+      toast.success('2FA verified');
+      navigate('/admin');
+    } catch (err) {
+      toast.error(err.message || '2FA verification failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-50 to-indigo-50 py-12 px-4 sm:px-6 lg:px-8">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
@@ -87,8 +112,8 @@ const SignIn = () => {
             Welcome back! Please sign in to your account
           </p>
         </div>
-        
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+
+        <form className="mt-8 space-y-6" onSubmit={twoFARequired ? handleVerify2FA : handleSubmit}>
           <div className="rounded-md shadow-sm space-y-4">
             {/* Email Input */}
             <div>
@@ -107,7 +132,7 @@ const SignIn = () => {
                 onChange={handleChange}
               />
             </div>
-            
+
             {/* Password Input */}
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
@@ -134,6 +159,34 @@ const SignIn = () => {
                 </button>
               </div>
             </div>
+
+            {twoFARequired && (
+              <div>
+                <label htmlFor="twofa" className="block text-sm font-medium text-gray-700">
+                  2FA Code
+                </label>
+                <input
+                  id="twofa"
+                  name="twofa"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  required
+                  className="mt-1 appearance-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0F52BA] focus:border-[#0F52BA] sm:text-sm transition-all duration-200"
+                  placeholder="123456"
+                  value={twoFACode}
+                  onChange={(e) => setTwoFACode(e.target.value)}
+                />
+                <p className="mt-1 text-xs text-gray-500">Bạn đang đăng nhập từ mạng ngoài. Vui lòng nhập mã TOTP từ ứng dụng Authenticator.</p>
+              </div>
+            )}
+
+            {twoFARequired && (
+              <div className="flex items-center gap-2">
+                <input id="trust" type="checkbox" checked={trustDevice} onChange={(e) => setTrustDevice(e.target.checked)} />
+                <label htmlFor="trust" className="text-sm text-gray-700">Trust this device for 30 days</label>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-between">

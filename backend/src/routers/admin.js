@@ -7,6 +7,7 @@ const {
   authorizeRoles,
   isAdmin,
 } = require("../middleware/auth.middleware");
+const adminAccessGuard = require('../middleware/adminAccessGuard');
 
 // Import các controller functions từ adminController
 const {
@@ -75,6 +76,7 @@ const {
 // Áp dụng middleware xác thực và phân quyền admin cho tất cả các route trong file này
 router.use(authMiddleware);
 router.use(authorizeRoles("admin"));
+router.use(adminAccessGuard);
 
 // --- User Management Routes ---
 router.get("/users", getAllUsers);
