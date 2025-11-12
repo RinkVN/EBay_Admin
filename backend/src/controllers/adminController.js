@@ -1744,7 +1744,7 @@ exports.getAdminReport = async (req, res) => {
       ),
       // Đếm active seller và buyer từ danh sách ID
       User.countDocuments({ role: "seller", _id: { $in: activeSellerIds } }),
-      User.countDocuments({ role: "user", _id: { $in: activeBuyerIds } }),
+      User.countDocuments({ role: "buyer", _id: { $in: activeBuyerIds } }),
     ]);
 
     const orderStatus = {
