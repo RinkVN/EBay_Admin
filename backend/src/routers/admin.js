@@ -104,8 +104,9 @@ router.put("/stores/:storeId/status", updateStoreStatusByAdmin);
 // router.delete("/categories/:categoryId", deleteCategoryAdmin);
 
 // // --- Dispute Management Routes ---
-// router.get("/disputes", getAllDisputesAdmin);
-// router.put("/disputes/:disputeId", updateDisputeByAdmin);
+// --- Dispute Management Routes ---
+router.get("/disputes", getAllDisputesAdmin);
+router.put("/disputes/:disputeId", updateDisputeByAdmin);
 
 // --- Product Management by Admin Routes ---
 router.get("/products", getAllProductsAdmin); // danh sách
@@ -123,6 +124,7 @@ router.put("/orders/:orderId/status", updateOrderStatusAdmin);
 // --- Review and Feedback Moderation Routes ---
 router.get("/reviews", getAllReviewsAdmin); // danh sách đánh giá
 router.delete("/reviews/:id", deleteReviewAdmin); // xoá đánh giá theo ID
+router.get('/seller-feedbacks', getAllSellerFeedbackAdmin); // danh sách feedback của seller
 
 // --- Admin Dashboard Routes ---
 router.get("/report", getAdminReport);

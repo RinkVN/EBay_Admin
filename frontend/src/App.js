@@ -65,6 +65,9 @@ import { ROLES } from './utils/roles';
 import AdminSetup2FA from "./pages/AdminSetup2FA.jsx";
 import LockedAccount from "./pages/LockedAccount";
 import PendingAccount from "./pages/PendingAccount";
+import ManageReviews from "./pages/DashboardAdmin/ManageReview/ManageReviews";
+import ManageDisputes from "./pages/DashboardAdmin/ManageDispute/ManageDisputes";
+
 
 const Layout = () => {
   return (
@@ -158,6 +161,20 @@ const router = createBrowserRouter(
         <Route path="/admin/manage-orders" element={
           <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
             <ManageOrderAdmin />
+          </ProtectedRoute>
+        }></Route>
+
+        {/* Manage Reviews - Admin & Support */}
+        <Route path="/admin/manage-reviews" element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.SUPPORT]}>
+            <ManageReviews />
+          </ProtectedRoute>
+        }></Route>
+
+        {/* Manage Disputes - Admin & Support */}
+        <Route path="/admin/manage-disputes" element={
+          <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.SUPPORT]}>
+            <ManageDisputes />
           </ProtectedRoute>
         }></Route>
       </Route>

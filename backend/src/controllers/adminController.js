@@ -956,7 +956,7 @@ exports.updateOrderStatusAdmin = async (req, res) => {
  * @access Riêng tư (Admin)
  */
 exports.getAllReviewsAdmin = async (req, res) => {
-  const { productId, reviewerId, storeId, page = 1, limit = 10 } = req.query;
+  const { productId, reviewerId, storeId, page = 1, limit = 10, search, rating } = req.query;
   try {
     let match = {};
     if (productId) match.productId = new mongoose.Types.ObjectId(productId);
@@ -974,45 +974,80 @@ exports.getAllReviewsAdmin = async (req, res) => {
       match.productId = { $in: products.map((p) => p._id) };
     }
 
-    const reviews = await Review.aggregate([
-      { $match: match },
-      { $skip: (page - 1) * limit },
-      { $limit: parseInt(limit) },
-      {
-        $lookup: {
-          from: "products",
-          localField: "productId",
-          foreignField: "_id",
-          as: "product",
-        },
-      },
-      { $unwind: "$product" },
-      {
-        $lookup: {
-          from: "users",
-          localField: "reviewerId",
-          foreignField: "_id",
-          as: "reviewer",
-        },
-      },
-      { $unwind: "$reviewer" },
-      {
-        $project: {
-          rating: 1,
-          comment: 1,
-          createdAt: 1,
-          "product.title": 1,
-          "reviewer.username": 1,
-        },
-      },
-    ]);
+    // Build aggregation pipeline supporting optional search and rating filters
+    const pipeline = [];
 
-    const total = await Review.countDocuments(match);
+    // Initial match for productId/reviewerId/storeId
+    pipeline.push({ $match: match });
+
+    // Lookup product and reviewer first to allow searching by their fields
+    pipeline.push({
+      $lookup: {
+        from: "products",
+        localField: "productId",
+        foreignField: "_id",
+        as: "product",
+      },
+    });
+    pipeline.push({ $unwind: "$product" });
+    pipeline.push({
+      $lookup: {
+        from: "users",
+        localField: "reviewerId",
+        foreignField: "_id",
+        as: "reviewer",
+      },
+    });
+    pipeline.push({ $unwind: "$reviewer" });
+
+    // Apply search filter if provided (searches comment, product title, reviewer username)
+    if (search) {
+      const regex = new RegExp(search, "i");
+      pipeline.push({
+        $match: {
+          $or: [
+            { comment: { $regex: regex } },
+            { "product.title": { $regex: regex } },
+            { "reviewer.username": { $regex: regex } },
+          ],
+        },
+      });
+    }
+
+    // Apply rating filter if provided
+    if (rating) {
+      const r = parseInt(rating);
+      if (!isNaN(r)) pipeline.push({ $match: { rating: r } });
+    }
+
+    // Project fields
+    pipeline.push({
+      $project: {
+        rating: 1,
+        comment: 1,
+        createdAt: 1,
+        "product.title": 1,
+        "reviewer.username": 1,
+      },
+    });
+
+    // Pagination
+    pipeline.push({ $sort: { createdAt: -1 } });
+    pipeline.push({ $skip: (parseInt(page) - 1) * parseInt(limit) });
+    pipeline.push({ $limit: parseInt(limit) });
+
+    const reviews = await Review.aggregate(pipeline);
+
+    // For total we need to run a similar pipeline without skip/limit to count
+    const countPipeline = pipeline.slice(0, -3); // remove sort/skip/limit
+    countPipeline.push({ $count: 'total' });
+    const countRes = await Review.aggregate(countPipeline);
+    const total = countRes[0] ? countRes[0].total : 0;
 
     res.status(200).json({
       success: true,
       count: reviews.length,
-      totalPages: Math.ceil(total / limit),
+      totalPages: Math.ceil(total / parseInt(limit)),
       currentPage: parseInt(page),
       data: reviews,
     });
@@ -1037,6 +1072,122 @@ exports.deleteReviewAdmin = async (req, res) => {
     res.status(200).json({ success: true, message: "Xóa đánh giá thành công" });
   } catch (error) {
     handleError(res, error, "Lỗi khi xóa đánh giá");
+  }
+};
+
+/**
+ * @desc Lấy tất cả khiếu nại cho Admin (lọc, phân trang)
+ * @route GET /api/admin/disputes
+ * @access Riêng tư (Admin)
+ */
+exports.getAllDisputesAdmin = async (req, res) => {
+  const { status, page = 1, limit = 10, search } = req.query;
+  try {
+    const query = {};
+    if (status && ["open", "under_review", "resolved", "closed"].includes(status)) {
+      query.status = status;
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // If search provided, attempt to match description, raisedBy username, or orderItemId
+    if (search) {
+      const regex = new RegExp(search, 'i');
+      // find users matching username
+      const users = await User.find({ username: { $regex: regex } }).select('_id');
+      const userIds = users.map(u => u._id);
+      const orClauses = [ { description: { $regex: regex } } ];
+      if (userIds.length) orClauses.push({ raisedBy: { $in: userIds } });
+      // if search looks like an ObjectId, include orderItemId match
+      if (mongoose.Types.ObjectId.isValid(search)) {
+        orClauses.push({ orderItemId: mongoose.Types.ObjectId(search) });
+      }
+      query.$or = orClauses;
+    }
+
+    const disputes = await Dispute.find(query)
+      .populate({ path: 'orderItemId', populate: { path: 'productId', select: 'title' } })
+      .populate({ path: 'raisedBy', select: 'username email' })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Dispute.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      count: disputes.length,
+      totalPages: Math.ceil(total / parseInt(limit)),
+      currentPage: parseInt(page),
+      data: disputes,
+    });
+  } catch (error) {
+    handleError(res, error, 'Lỗi khi lấy danh sách khiếu nại');
+  }
+};
+
+/**
+ * @desc Cập nhật / thao tác khiếu nại bởi Admin (assign / adjudicate / close)
+ * @route PUT /api/admin/disputes/:disputeId
+ * @access Riêng tư (Admin)
+ */
+exports.updateDisputeByAdmin = async (req, res) => {
+  const { disputeId } = req.params;
+  const { action, note } = req.body;
+
+  try {
+    const dispute = await Dispute.findById(disputeId);
+    if (!dispute) {
+      return res.status(404).json({ success: false, message: 'Dispute not found' });
+    }
+
+    // Allow updating status and resolution directly
+    const { status: newStatus, resolution: newResolution } = req.body;
+
+    let changed = false;
+    if (newStatus && ["open", "under_review", "resolved", "closed"].includes(newStatus)) {
+      dispute.status = newStatus;
+      changed = true;
+    }
+
+    if (newResolution !== undefined) {
+      dispute.resolution = newResolution;
+      changed = true;
+    }
+
+    // Support legacy 'close' action for backward compatibility
+    if (action === 'close') {
+      dispute.status = 'closed';
+      if (note) {
+        dispute.resolution = `${dispute.resolution || ''}\n[Admin Note] ${note}`.trim();
+      }
+      changed = true;
+    }
+
+    if (!changed) {
+      return res.status(400).json({ success: false, message: 'No valid update provided' });
+    }
+
+    await dispute.save();
+    return res.status(200).json({ success: true, message: 'Dispute updated', data: dispute });
+  } catch (error) {
+    handleError(res, error, 'Error updating dispute');
+  }
+};
+
+/**
+ * @desc Lấy thống kê/feedback của các seller (Feedback collection)
+ * @route GET /api/admin/seller-feedbacks
+ * @access Riêng tư (Admin)
+ */
+exports.getAllSellerFeedbackAdmin = async (req, res) => {
+  try {
+    const feedbacks = await Feedback.find()
+      .populate('sellerId', 'username email')
+      .sort({ updatedAt: -1 });
+    res.status(200).json({ success: true, count: feedbacks.length, data: feedbacks });
+  } catch (error) {
+    handleError(res, error, 'Lỗi khi lấy feedback của seller');
   }
 };
 

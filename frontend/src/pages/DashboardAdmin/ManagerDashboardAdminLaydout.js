@@ -30,6 +30,8 @@ import StoreIcon from "@mui/icons-material/Store";
 import InventoryIcon from "@mui/icons-material/Inventory";
 import LocalOfferIcon from "@mui/icons-material/LocalOffer"; // Icon cho Voucher
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
+import RateReviewIcon from '@mui/icons-material/RateReview';
+import GavelIcon from '@mui/icons-material/Gavel';
 
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
@@ -357,6 +359,42 @@ export default function AdminDashboardLayout() {
                     primary="Manage Products"
                     primaryTypographyProps={{
                       fontWeight: currentPath === "/admin/manage-products" ? 'bold' : 'normal'
+                    }}
+                  />
+                </ListItemButton>
+              )}
+
+              {/* Manage Reviews - Admin & Support */}
+              {canAccess(['admin', 'support']) && (
+                <ListItemButton
+                  onClick={() => navigate("/admin/manage-reviews")}
+                  selected={currentPath === "/admin/manage-reviews"}
+                >
+                  <ListItemIcon sx={{ color: "primary.contrastText" }}>
+                    <RateReviewIcon />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Manage Reviews"
+                    primaryTypographyProps={{
+                      fontWeight: currentPath === "/admin/manage-reviews" ? 'bold' : 'normal'
+                    }}
+                  />
+                </ListItemButton>
+              )}
+
+              {/* Manage Disputes - Admin & Support */}
+              {canAccess(['admin', 'support']) && (
+                <ListItemButton
+                  onClick={() => navigate("/admin/manage-disputes")}
+                  selected={currentPath === "/admin/manage-disputes"}
+                >
+                  <ListItemIcon sx={{ color: "primary.contrastText" }}>
+                    <GavelIcon />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Manage Disputes"
+                    primaryTypographyProps={{
+                      fontWeight: currentPath === "/admin/manage-disputes" ? 'bold' : 'normal'
                     }}
                   />
                 </ListItemButton>

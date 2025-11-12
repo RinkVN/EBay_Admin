@@ -11,7 +11,8 @@ const disputeSchema = new Schema(
       enum: ["open", "under_review", "resolved", "closed"],
       default: "open",
     },
-    resolution: { type: String },
+      resolution: { type: String },
+      // (removed assignee/adminNotes — simplified dispute model)
   },
   { timestamps: true }
 );
