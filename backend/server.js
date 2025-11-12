@@ -11,8 +11,22 @@ const cookieParser = require('cookie-parser');
 const app = express();
 dotenv.config(); // Move dotenv.config() before using process.env
 
+// CORS configuration - support multiple origins for deployment
+const allowedOrigins = process.env.CLIENT_URL
+  ? process.env.CLIENT_URL.split(',').map(url => url.trim())
+  : ['http://localhost:3000'];
+
 app.use(cors({
-  origin: [process.env.CLIENT_URL || 'http://localhost:3000'],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
 app.use(express.json());
@@ -42,8 +56,14 @@ app.use((req, res, next) => {
   next();
 });
 
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 9999;
 const MONGO_URI = process.env.MONGO_URI;
+
+// Validate required environment variables
+if (!MONGO_URI) {
+  console.error('MONGO_URI is not defined in environment variables');
+  process.exit(1);
+}
 
 // Improve MongoDB connection with error handling
 console.log('Connecting to MongoDB...');
@@ -57,6 +77,15 @@ connect(MONGO_URI, { dbName: 'ebay_admin' })
   });
 
 app.use("/api", router);
+
+// Health check endpoint for Render
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    message: 'Server is running',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Fallback route for handling payment redirects
 app.get('/', (req, res) => {
@@ -82,9 +111,10 @@ const io = initSocketServer(server);
 app.set('io', io);
 
 // Listen on server (not app)
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running at PORT ${PORT}`);
   console.log(`WebSocket server is running`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 
   // Initialize schedulers after server starts
   initScheduler();
