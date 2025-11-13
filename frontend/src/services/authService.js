@@ -11,7 +11,7 @@ export const login = async (credentials) => {
     return response.data;
   } catch (error) {
     // If account is locked or pending, return the error response data instead of throwing
-    if (error.response?.data?.accountStatus === 'locked' || error.response?.data?.accountStatus === 'pending' || error.response?.data?.accountStatus === 'rejected') {
+    if (error.response?.data?.accountStatus === 'locked' || error.response?.data?.accountStatus === 'rejected') {
       return error.response.data;
     }
     throw new Error(
