@@ -56,6 +56,7 @@ exports.register = async (req, res) => {
       email,
       password, // Sẽ được mã hóa bởi hook pre-save
       role: role || "buyer",
+      accountStatus: "approved",
     });
 
     await user.save();
@@ -164,14 +165,6 @@ exports.login = async (req, res) => {
     }
 
     // Check if account is pending approval
-    if (user.accountStatus === 'pending') {
-      return res.status(403).json({
-        success: false,
-        message: "Tài khoản của bạn đang chờ được duyệt",
-        accountStatus: 'pending'
-      });
-    }
-
     // Otherwise issue full token (include twoFAVerified if internal)
     const token = jwt.sign(
       { id: user._id, role: user.role, twoFAVerified: internal },

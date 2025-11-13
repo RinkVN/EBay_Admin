@@ -89,12 +89,6 @@ const SignIn = () => {
         return;
       }
 
-      if (response.accountStatus === 'pending') {
-        // Redirect to pending account page
-        navigate('/pending-account');
-        return;
-      }
-
       dispatch(setCredentials({ user: response.user, token: response.accessToken || response.token }));
       toast.success('Login successful!');
 
@@ -124,12 +118,6 @@ const SignIn = () => {
         if (error.response.data.rejectionReason) {
           localStorage.setItem('rejectionReason', error.response.data.rejectionReason);
         }
-        navigate('/pending-account');
-        return;
-      }
-
-      if (error.response?.data?.accountStatus === 'pending') {
-        // Redirect to pending account page
         navigate('/pending-account');
         return;
       }
