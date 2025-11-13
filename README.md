@@ -54,21 +54,32 @@ Before you begin, ensure you have met the following requirements:
     Create a `.env` file in the `backend` directory and populate it with the necessary environment variables (see Configuration Options).  Example variables (replace with your actual values):
 
     ```
-    PORT=3000
+    PORT=9999
     MONGODB_URI=mongodb://localhost:27017/ebay_admin
     JWT_SECRET=your_secret_key
     CLOUDINARY_URL=cloudinary://your_api_key:your_api_secret@your_cloud_name
 
-    # VietQR variables
-    BANK_ACCOUNT_NO=your_bank_account_no
-    BANK_ACCOUNT_NAME=your_bank_account_name
-    BANK_ACQ_ID=your_bank_acq_id
-    VIETQR_CLIENT_ID=your_vietqr_client_id
-    VIETQR_API_KEY=your_vietqr_api_key
+    ADMIN_IP_ALLOWLIST=
 
-    # PayOS variables
-    PAYOS_CLIENT_ID=your_payos_client_id
-    # ... (other PayOS variables)
+    EMAIL_HOST=***.gmail.com
+    EMAIL_PORT=***
+    EMAIL_USER=***@gmail.com
+    EMAIL_PASS=***
+    
+    # --- Thông tin tích hợp VietQR ---
+    # Lấy từ tài khoản Business của bạn trên my.vietqr.io
+    VIETQR_CLIENT_ID=***
+    VIETQR_API_KEY=***
+    
+    PAYOS_API_KEY=***
+    PAYOS_SECRET_KEY=***
+    PAYOS_CLIENT_ID=***
+    PAYOS_CHECKSUM_KEY=***
+    # --- Thông tin tài khoản ngân hàng nhận tiền ---
+    # Mã BIN của ngân hàng bạn. Tra cứu tại: https://api.vietqr.io/v2/banks
+    BANK_ACQ_ID=***
+    BANK_ACCOUNT_NO=***
+    BANK_ACCOUNT_NAME=***
     ```
 
 5.  **Start the Server:**
