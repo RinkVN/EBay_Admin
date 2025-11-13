@@ -145,3 +145,16 @@ This project does not currently have a specified license.  All rights are reserv
 ## Acknowledgments
 
 *   This project utilizes various open-source libraries and frameworks, including Node.js, Express.js, Mongoose, Cloudinary, and others. We acknowledge and appreciate the contributions of the developers of these tools.
+
+7.   **Test account:**
+      ```
+      admin@gmail.com
+      admin123456
+    ```
+7.   **Demo:**
+<img width="1502" height="724" alt="Screenshot 2025-11-13 at 21 50 12" src="https://github.com/user-attachments/assets/5d6acbe7-4340-461f-b5ac-a66e43828eea" />
+<img width="1492" height="729" alt="Screenshot 2025-11-13 at 21 51 00" src="https://github.com/user-attachments/assets/e36f08a7-2783-421b-aaae-26bbb57ccb56" />
+<img width="948" height="840" alt="Screenshot 2025-11-13 at 21 51 57" src="https://github.com/user-attachments/assets/7af22b76-5971-43ea-905e-5dff5e100658" />
+<img width="2560" height="1366" alt="Screenshot 2025-11-13 at 21 52 45" src="https://github.com/user-attachments/assets/0931cad4-bd44-46c3-83f4-198d9aa748da" />
+
+
