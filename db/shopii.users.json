@@ -51,4 +51,41 @@
   "updatedAt": {
     "$date": "2025-07-24T06:26:46.325Z"
   }
-}]
+},
+{
+  "_id": {
+    "$oid": "690c7fdaaa95f07461f075b7"
+  },
+  "username": "dat10bn@gmail.com",
+  "fullname": "Nguyễn Tiến Đạt",
+  "email": "admin@gmail.com",
+  "password": "$2b$10$pp4wgSirb8ql9onhjOFqvOLF1SP.xmAWmp26IW8NFPXisozTdbadC",
+  "role": "admin",
+  "action": "unlock",
+  "createdAt": {
+    "$date": "2025-11-06T11:00:42.056Z"
+  },
+  "updatedAt": {
+    "$date": "2025-11-11T15:37:05.928Z"
+  },
+  "__v": 2,
+  "trustedDevices": [
+    {
+      "tokenHash": "917aa1a7794efc0697cb1098a8f1cafb0287cff7af6841ce19a6ab1ad4c2e620",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0",
+      "expiresAt": {
+        "$date": "2025-12-11T15:37:05.926Z"
+      },
+      "_id": {
+        "$oid": "691358216ea88d40f27d813b"
+      },
+      "createdAt": {
+        "$date": "2025-11-11T15:37:05.927Z"
+      }
+    }
+  ],
+  "twoFAEnabled": true,
+  "twoFASecret": "JFHUST2KHFNHW4TFJQ4EYNTDMI4CIXJRNUZXATJJPBPE6TCLNFTQ",
+  "accountStatus": "approved"
+}
+]
